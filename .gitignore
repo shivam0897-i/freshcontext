@@ -1,0 +1,8 @@
+.firecrawl/
+node_modules/
+dist/
+dist.dev/
+docs/superpowers/
+.tools/
+*.zip
+*.log
