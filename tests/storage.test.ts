@@ -1,0 +1,82 @@
+import { beforeEach, describe, expect, it } from 'vitest'
+import {
+  clearPendingBrief,
+  getPendingBrief,
+  getSettings,
+  saveBrief,
+  savePendingBrief,
+  setSettings,
+} from '../src/core/storage'
+import { DEFAULT_PROMPT } from '../src/core/brief'
+
+function installChromeMock(): void {
+  const store = new Map<string, unknown>()
+  ;(globalThis as Record<string, unknown>)['chrome'] = {
+    storage: {
+      local: {
+        get: (keys: string | string[]) =>
+          Promise.resolve(
+            typeof keys === 'string' ? { [keys]: store.get(keys) } : Object.fromEntries(keys.map((k) => [k, store.get(k)])),
+          ),
+        set: (items: Record<string, unknown>) => {
+          Object.entries(items).forEach(([k, v]) => store.set(k, v))
+          return Promise.resolve()
+        },
+        remove: (keys: string | string[]) => {
+          ;(typeof keys === 'string' ? [keys] : keys).forEach((k) => store.delete(k))
+          return Promise.resolve()
+        },
+      },
+    },
+  }
+}
+
+beforeEach(() => {
+  installChromeMock()
+})
+
+describe('settings', () => {
+  it('returns defaults when nothing is stored', async () => {
+    const s = await getSettings()
+    expect(s.thresholds.amber).toBe(0.7)
+    expect(s.windows.chatgpt).toBe(32_000)
+    expect(s.promptTemplate).toBe(DEFAULT_PROMPT)
+    expect(s.autoSend).toBe(false)
+  })
+
+  it('merges partial patches with defaults', async () => {
+    await setSettings({ windows: { chatgpt: 128_000, claude: 200_000, gemini: 32_000 } })
+    const s = await getSettings()
+    expect(s.windows.chatgpt).toBe(128_000)
+    expect(s.thresholds.red).toBe(0.85) // untouched default survives
+  })
+})
+
+describe('pending brief', () => {
+  it('round-trips a pending brief', async () => {
+    await savePendingBrief({
+      destPlatform: 'claude',
+      text: 'GOAL\nDo the thing.',
+      autoSend: false,
+      createdAt: 1_000,
+    })
+    const pending = await getPendingBrief()
+    expect(pending?.destPlatform).toBe('claude')
+    expect(pending?.text).toContain('GOAL')
+
+    await clearPendingBrief()
+    expect(await getPendingBrief()).toBeNull()
+  })
+})
+
+describe('saved briefs', () => {
+  it('stores briefs most-recent-first and caps the history at 20', async () => {
+    for (let i = 0; i < 25; i++) {
+      await saveBrief('chatgpt', `brief ${i}`)
+    }
+    const raw = await chrome.storage.local.get('briefs')
+    const briefs = raw['briefs'] as { text: string }[]
+    expect(briefs).toHaveLength(20)
+    expect(briefs[0]?.text).toBe('brief 24')
+  })
+})

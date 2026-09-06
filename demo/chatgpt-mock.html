@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Demo Chat — FreshContext harness</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.6 Inter, "Segoe UI", system-ui, sans-serif; background: #212121; color: #ececec; display: flex; flex-direction: column; height: 100vh; }
+  header { padding: 10px 20px; border-bottom: 1px solid #3a3a3a; display: flex; align-items: center; gap: 12px; }
+  header .tag { font: 500 10px ui-monospace, Consolas, monospace; letter-spacing: 1px; color: #8ab8a0; border: 1px solid #3d5a48; border-radius: 6px; padding: 3px 8px; }
+  header .hint { color: #9a9a9a; font-size: 12px; }
+  header .spacer { flex: 1; }
+  header button { font: 12px inherit; color: #ececec; background: #2d2d2d; border: 1px solid #444; border-radius: 8px; padding: 6px 12px; cursor: pointer; }
+  main { flex: 1; overflow-y: auto; padding: 20px; }
+  .turn { max-width: 720px; margin: 0 auto 18px; display: flex; }
+  .turn .bubble { border-radius: 14px; padding: 10px 16px; max-width: 88%; white-space: pre-wrap; }
+  .turn.user { justify-content: flex-end; }
+  .turn.user .bubble { background: #2f2f41; }
+  .turn.assistant .bubble { background: #2d2d2d; }
+  footer { border-top: 1px solid #3a3a3a; padding: 14px 20px; }
+  .composer { max-width: 760px; margin: 0 auto; display: flex; gap: 10px; align-items: flex-end; }
+  #prompt-textarea {
+    flex: 1; min-height: 48px; max-height: 200px; overflow-y: auto;
+    background: #2d2d2d; border: 1px solid #484848; border-radius: 12px;
+    padding: 13px 16px; outline: none; font: inherit; color: inherit; white-space: pre-wrap;
+  }
+  #prompt-textarea:focus { border-color: #6b6b7a; }
+  #send { width: 44px; height: 44px; border-radius: 12px; border: none; background: #ececec; color: #1a1a1a; font-size: 17px; cursor: pointer; flex: none; }
+  #send:disabled { background: #4a4a4a; color: #777; cursor: default; }
+</style>
+</head>
+<body>
+<header>
+  <span class="tag">DEMO HARNESS</span>
+  <span class="hint">Mirrors ChatGPT's DOM contract — the FreshContext extension runs here fully offline.</span>
+  <span class="spacer"></span>
+  <button id="add10">+10 messages (~30% context)</button>
+  <button id="add30">+30 messages (fills window)</button>
+</header>
+<main id="chat"></main>
+<footer>
+  <div class="composer">
+    <div id="prompt-textarea" contenteditable="true" role="textbox" aria-label="Prompt"></div>
+    <button id="send" data-testid="send-button" title="Send">↑</button>
+  </div>
+</footer>
+<script>
+(() => {
+  const chat = document.getElementById('chat')
+  const composer = document.getElementById('prompt-textarea')
+  const sendBtn = document.getElementById('send')
+
+  // --- state -------------------------------------------------------------
+  const turns = []
+  let streaming = false
+
+  const DEMO_CONTEXT = `building a personal finance dashboard in React with CSV bank-statement import`
+  const BRIEF = `GOAL
+Build a personal finance dashboard in React with CSV bank-statement import.
+
+DECISIONS
+- Vite + Tailwind for the toolchain — fast HMR, utility styling.
+- Recharts over D3 — simpler for the four chart types we need.
+- No state library yet; React Query for server state only.
+
+ARTIFACTS
+Dashboard.tsx (180 lines) — reproduced in full:
+
+export function Dashboard({ statements }: Props) {
+  const { data } = useTransactions(statements)
+  return <Grid>{CHARTS.map(c => <ChartCard key={c.id} chart={c} data={data} />)}</Grid>
+}
+
+STATE
+Auth flow is complete. Currently stuck on CSV date-format variants — three banks export dates differently.
+
+OPEN QUESTIONS
+- Which bank-statement formats must v1 support?
+- Should imports run client-side or in a worker?
+
+PREFERENCES
+TypeScript strict. Concise answers. No default exports.`
+
+  // --- rendering ---------------------------------------------------------
+  function renderTurn(t) {
+    const wrap = document.createElement('div')
+    wrap.className = 'turn ' + t.role
+    wrap.setAttribute('data-message-author-role', t.role)
+    const bubble = document.createElement('div')
+    bubble.className = 'bubble'
+    bubble.setAttribute('data-message-content', '')
+    bubble.textContent = t.text
+    wrap.appendChild(bubble)
+    chat.appendChild(wrap)
+    chat.scrollTop = chat.scrollHeight
+  }
+
+  function renderAll() {
+    chat.innerHTML = ''
+    turns.forEach(renderTurn)
+  }
+
+  // --- composer: ProseMirror-style paste handling -------------------------
+  // A plain contenteditable ignores synthetic paste events, so the harness
+  // installs the handler ProseMirror would have: insert clipboard text.
+  composer.addEventListener('paste', (e) => {
+    e.preventDefault()
+    const text = e.clipboardData ? e.clipboardData.getData('text/plain') : ''
+    document.execCommand('insertText', false, text)
+  })
+
+  composer.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      doSend()
+    }
+  })
+
+  sendBtn.addEventListener('click', doSend)
+
+  function currentText() { return composer.innerText.trim() }
+
+  function clearComposer() { composer.innerHTML = '' }
+
+  // --- send / reply simulation --------------------------------------------
+  function doSend() {
+    if (streaming) return
+    const text = currentText()
+    if (!text) return
+    turns.push({ role: 'user', text })
+    renderTurn({ role: 'user', text })
+    clearComposer()
+    reply(text)
+  }
+
+  function reply(prompt) {
+    streaming = true
+    setStop(true)
+    const isBriefRequest = /handoff brief/i.test(prompt)
+    const full = isBriefRequest
+      ? BRIEF
+      : `Continuing our work on ${DEMO_CONTEXT}. (This is the offline demo harness — ask for a "handoff brief" with the FreshContext button to see the full flow.)`
+
+    const wrap = document.createElement('div')
+    wrap.className = 'turn assistant'
+    wrap.setAttribute('data-message-author-role', 'assistant')
+    const bubble = document.createElement('div')
+    bubble.className = 'bubble'
+    bubble.setAttribute('data-message-content', '')
+    wrap.appendChild(bubble)
+    chat.appendChild(wrap)
+
+    // stream word by word so response-complete detection has something to do
+    const words = full.split(/(\s+)/)
+    let i = 0
+    const timer = setInterval(() => {
+      bubble.textContent = words.slice(0, i).join('')
+      i += 3
+      chat.scrollTop = chat.scrollHeight
+      if (i >= words.length + 3) {
+        clearInterval(timer)
+        bubble.textContent = full
+        turns.push({ role: 'assistant', text: full })
+        streaming = false
+        setStop(false)
+      }
+    }, 90)
+  }
+
+  function setStop(on) {
+    let btn = document.querySelector('[data-testid="stop-button"]')
+    if (on && !btn) {
+      btn = document.createElement('button')
+      btn.setAttribute('data-testid', 'stop-button')
+      btn.textContent = '■'
+      btn.title = 'Stop'
+      btn.style.cssText = 'position:fixed;bottom:86px;right:36px;width:44px;height:44px;border-radius:12px;border:none;background:#b8443c;color:#fff;font-size:15px;cursor:pointer;z-index:50'
+      document.body.appendChild(btn)
+    } else if (!on && btn) {
+      btn.remove()
+    }
+  }
+
+  // --- filler -------------------------------------------------------------
+  const FILLER = `Review the quarterly transaction aggregation logic. ` +
+    `The dashboard groups spending by category and month, then computes a rolling ninety-day average per category so unusual months stand out. ` +
+    `We normalize merchant names because the same merchant appears under five different display strings in the raw statements, which skews category totals. ` +
+    `The CSV importer currently assumes headers exist, trimmed cells, and ISO dates, but real exports mix formats across banks. `.repeat(8)
+
+  function addMessages(n) {
+    for (let i = 0; i < n; i++) {
+      const role = i % 2 === 0 ? 'user' : 'assistant'
+      const text = role === 'user'
+        ? `Message ${turns.length + 1}: ${FILLER.slice(0, 3400)}`
+        : `Understood — ${FILLER.slice(0, 3400)}`
+      turns.push({ role, text })
+    }
+    renderAll()
+  }
+
+  document.getElementById('add10').addEventListener('click', () => addMessages(10))
+  document.getElementById('add30').addEventListener('click', () => addMessages(30))
+
+  // --- seed ---------------------------------------------------------------
+  turns.push({ role: 'user', text: `Let's build a personal finance dashboard in React. We'll import bank statements as CSV and visualize spending by category.` })
+  turns.push({ role: 'assistant', text: `Sounds good. To start: Vite + React + TypeScript for the toolchain, Recharts for charts, and a small CSV parser. Shall I scaffold the components?` })
+  renderAll()
+})()
+</script>
+</body>
+</html>
