@@ -2,7 +2,7 @@ import { RESPONSE_TIMEOUT_MS } from './core/constants'
 import { buildTranscriptHandoff } from './core/handoff'
 import { countTokensViaBackground, openNewChat } from './core/rpc'
 import { getSettings, saveBrief, savePendingBrief, type Settings } from './core/storage'
-import type { LimitInfo } from './platforms/types'
+import type { ChatMessage, ChatSummary, LimitInfo } from './platforms/types'
 import { adapterFor } from './platforms'
 import type { PlatformAdapter } from './platforms/types'
 import type { BadgeController } from './ui/badge'
@@ -143,6 +143,49 @@ async function recoverFromLimit(
   })
 }
 
+/**
+ * History-picker transfer: read a conversation the user picked (without
+ * opening it) via the platform's same-session API, build the Markdown
+ * transcript handoff, and let the destination AI digest it. Same machinery
+ * as quota-recovery — triggered by choice instead of by a limit.
+ */
+export async function runTransfer(
+  adapter: PlatformAdapter,
+  ctx: FlowContext,
+  chat: ChatSummary,
+): Promise<void> {
+  const { badge, toast } = ctx
+  if (!adapter.readConversationById) return
+
+  badge.setBusy('Reading conversation…')
+  let messages: ChatMessage[] = []
+  try {
+    messages = await adapter.readConversationById(chat.id)
+  } catch {
+    messages = []
+  }
+  badge.reset()
+
+  if (messages.length === 0) {
+    toast.show(
+      `Couldn't read "${chat.title}" — the platform's API refused. Open the chat and use Fresh start instead.`,
+      'error',
+    )
+    return
+  }
+
+  const settings = await getSettings()
+  const handoff = buildTranscriptHandoff(adapter.label, messages)
+  void countTokensViaBackground(adapter.id, handoff)
+
+  openReviewOverlay(adapter, ctx, settings, {
+    variant: 'handoff',
+    reason: 'picked',
+    briefText: handoff,
+    sourceChatTitle: chat.title,
+  })
+}
+
 function openReviewOverlay(
   adapter: PlatformAdapter,
   ctx: FlowContext,
@@ -151,6 +194,8 @@ function openReviewOverlay(
     variant: 'brief' | 'handoff'
     briefText: string
     limitResetHint?: string
+    reason?: 'quota' | 'picked'
+    sourceChatTitle?: string
   },
 ): void {
   let closeReview: { close: () => void } | null = null
@@ -161,7 +206,9 @@ function openReviewOverlay(
     briefText: review.briefText,
     autoSend: settings.autoSend,
     variant: review.variant,
+    reason: review.reason,
     limitResetHint: review.limitResetHint,
+    sourceChatTitle: review.sourceChatTitle,
     windows: settings.windows,
     onConfirm: (dest, text, autoSend) => {
       void (async () => {

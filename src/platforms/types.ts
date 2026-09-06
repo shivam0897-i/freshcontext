@@ -5,6 +5,14 @@ export interface ChatMessage {
   text: string
 }
 
+/** A conversation in the platform's history list. */
+export interface ChatSummary {
+  id: string
+  title: string
+  /** Epoch milliseconds, when the platform reports it. */
+  updatedAt: number | null
+}
+
 export interface LimitInfo {
   /** True when the platform says the user cannot send right now. */
   hit: boolean
@@ -62,4 +70,15 @@ export interface PlatformAdapter {
 
   /** Whatever limit info the platform actually exposes. Null when it doesn't. */
   readLimits(): Promise<LimitInfo | null>
+
+  /**
+   * Conversation-history capabilities. Optional per platform: present only
+   * where the same-session API allows reading a conversation the user has
+   * NOT opened (ChatGPT, Claude). Absent on Gemini — no same-session API,
+   * so its history can only be transferred by opening the chat first.
+   */
+  listChats?(): Promise<ChatSummary[]>
+  readConversationById?(id: string): Promise<ChatMessage[]>
+  /** The conversation currently open in this tab, if the URL identifies one. */
+  currentConversationId?(): string | null
 }

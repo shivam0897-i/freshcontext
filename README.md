@@ -25,6 +25,7 @@ FreshContext gives you a third option: **one click asks the AI to write a struct
 
 - **The badge** shows how full the conversation's context window is: green → amber (~70%) → red (~85%). Click it for details.
 - **Fresh start** — the button injects the brief request into your current chat, waits for the AI to write it, then shows a review overlay where you can edit the brief, pick a destination (same platform, or ChatGPT/Claude/Gemini), and continue. The brief is **saved locally and copied to your clipboard automatically** before anything navigates — you can never lose it.
+- **Transfer an older chat** — on ChatGPT and Claude, the badge card offers "Transfer an older chat…": pick any conversation from your history and hand it to a fresh chat on any platform — the same platform included — without opening it first. The destination AI digests the transcript and continues. (Gemini exposes no same-session API, so its chats transfer via the normal Fresh start after opening.)
 - **Side panel** (toolbar icon): pick your plan per platform (Free/Plus/Pro — no token numbers to research), choose warning sensitivity (Relaxed/Balanced/Strict), toggle the badge and auto-send per platform, and revisit or clear your handoff history. Everything saves on change — there is no Save button to forget.
 - **Auto-send is off by default** — the brief lands in the composer and you press Enter. Automation you can see and control.
 
@@ -113,6 +114,7 @@ How the extension handles the situations you'll actually run into:
 - **Changed settings in the side panel** — thresholds, window sizes, and the prompt apply immediately to open tabs; no reload.
 - **Badge covers a site's own buttons** — drag the badge anywhere; the position is remembered per browser.
 - **Not logged into the destination platform** — the pending brief waits (saved + on your clipboard); it inserts once you're logged in and the destination chat page loads.
+- **Picking an older chat** — the history picker reads your recent conversations through the same session the page itself uses; it never leaves the browser. Only the 30 most recent chats are listed (search filters within them).
 - **Known limits:** old Gemini chats stay DOM-based (Gemini exposes no same-session API; loading full history would hijack your scrolling), so their meter is a labeled estimate. Token counts for Claude and Gemini are labeled estimates by design — only ChatGPT counts are exact.
 
 ## License

@@ -20,6 +20,8 @@ export interface BadgeOptions {
   onFreshStart: () => void
   /** Fired whenever the card is expanded — the host refreshes limit info. */
   onCardOpen?: () => void
+  /** Open the older-chat picker. Provided only when the platform supports it. */
+  onPickChat?: () => void
 }
 
 const LEVEL_COLOR: Record<string, string> = {
@@ -114,6 +116,11 @@ export function mountBadge(options: BadgeOptions): BadgeController {
       border: 1px solid ${TOKENS.border}; color: ${TOKENS.muted};
       border-radius: ${TOKENS.radius}; padding: 8px 14px; font-size: 12px;
     }
+    .pickChat {
+      width: 100%; text-align: center; margin-top: 8px;
+      font-size: 11.5px; color: ${TOKENS.muted};
+    }
+    .pickChat:hover { color: ${TOKENS.text}; }
     .meta { font-family: ${TOKENS.mono}; font-size: 9px; letter-spacing: 1px; color: ${TOKENS.faint}; margin-top: 8px; }
     .limit {
       display: none; margin-top: 8px; padding-top: 8px; border-top: 1px solid ${TOKENS.border};
@@ -166,12 +173,22 @@ export function mountBadge(options: BadgeOptions): BadgeController {
   ghost.className = 'ghost'
   ghost.textContent = 'Not now'
   row.append(primary, ghost)
+  const pickChat = document.createElement('button')
+  pickChat.className = 'pickChat'
+  pickChat.textContent = 'Transfer an older chat…'
+  pickChat.style.display = 'none'
+  pickChat.addEventListener('click', (e) => {
+    e.stopPropagation()
+    toggleCard(false)
+    options.onPickChat?.()
+  })
   const meta = document.createElement('div')
   meta.className = 'meta'
   const limitLine = document.createElement('div')
   limitLine.className = 'limit'
-  card.append(title, desc, row, meta, limitLine)
+  card.append(title, desc, row, pickChat, meta, limitLine)
   anchor.appendChild(card)
+  if (options.onPickChat) pickChat.style.display = ''
 
   let expanded = false
   let current: MeterState | null = null

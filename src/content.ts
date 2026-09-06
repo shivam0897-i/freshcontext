@@ -6,9 +6,10 @@ import type { PlatformAdapter } from './platforms/types'
 import { sleep } from './platforms/dom'
 import { startMeter } from './meter-runtime'
 import { mountBadge } from './ui/badge'
+import { openPicker } from './ui/picker'
 import { mountToast } from './ui/toast'
 import type { ToastController } from './ui/toast'
-import { runFreshStart } from './flow'
+import { runFreshStart, runTransfer } from './flow'
 
 /**
  * Content-script entry — the composition root. It wires pure core, adapters,
@@ -76,19 +77,36 @@ async function main(): Promise<void> {
   if (settings.enabledPlatforms[adapter.id] === false) return
 
   let meter: ReturnType<typeof startMeter> | null = null
+  const flowContext = () => ({
+    badge,
+    toast,
+    pct: meter?.getDisplayed()?.pct ?? 0,
+  })
   const badge = mountBadge({
     onFreshStart: () => {
-      void runFreshStart(adapter, {
-        badge,
-        toast,
-        pct: meter?.getDisplayed()?.pct ?? 0,
-      })
+      void runFreshStart(adapter, flowContext())
     },
     onCardOpen: () => {
       // Refresh the platform's limit status whenever the card is expanded —
       // event-driven, no polling.
       void adapter.readLimits().then((info) => badge.setLimit(info))
     },
+    // The history picker exists only where the same-session API can read
+    // unopened conversations (ChatGPT, Claude).
+    ...(adapter.listChats && adapter.readConversationById
+      ? {
+          onPickChat: () =>
+            openPicker({
+              platformLabel: adapter.label,
+              loadChats: () => adapter.listChats!(),
+              currentId: adapter.currentConversationId?.() ?? null,
+              onPick: (chat) => {
+                void runTransfer(adapter, flowContext(), chat)
+              },
+              onClose: () => undefined,
+            }),
+        }
+      : {}),
   })
   badge.setVisible(settings.badgeVisible)
 

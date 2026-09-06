@@ -12,7 +12,7 @@ import {
   waitForNewAssistantMessage,
 } from './dom'
 import { scanForLimitText } from './chatgpt'
-import type { ChatMessage, LimitInfo, PlatformAdapter, SubmitResult } from './types'
+import type { ChatMessage, ChatSummary, LimitInfo, PlatformAdapter, SubmitResult } from './types'
 
 const COMPOSER_SELECTOR =
   'div[data-placeholder][contenteditable="true"], [contenteditable="true"][role="textbox"]'
@@ -70,13 +70,11 @@ function readViaDom(): ChatMessage[] {
   return out
 }
 
-/** Same-session internal-API read — the pattern claude-chat-exporter ships with. */
-async function readViaApi(): Promise<ChatMessage[] | null> {
+/** Same-session internal-API access — the pattern claude-chat-exporter ships with. */
+async function fetchConversationById(id: string): Promise<ChatMessage[] | null> {
   try {
-    const id = conversationId()
     const orgId = readCookie('lastActiveOrg')
-    if (!id || !orgId) return null
-
+    if (!orgId) return null
     const res = await fetch(
       `/api/organizations/${orgId}/chat_conversations/${id}?tree=true&rendering_mode=messages&render_all_tools=true`,
       { credentials: 'include' },
@@ -96,6 +94,45 @@ async function readViaApi(): Promise<ChatMessage[] | null> {
       if (text.trim()) out.push({ role, text })
     }
     return out.length ? out : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * The history list: GET /api/organizations/{org}/chat_conversations returns
+ * a top-level JSON array of conversations (uuid, name, summary, timestamps).
+ * Names can be empty — summary then title fallback keeps rows readable.
+ */
+async function fetchChatList(): Promise<ChatSummary[] | null> {
+  try {
+    const orgId = readCookie('lastActiveOrg')
+    if (!orgId) return null
+    const res = await fetch(`/api/organizations/${orgId}/chat_conversations`, {
+      credentials: 'include',
+    })
+    if (!res.ok) return null
+    const data = (await res.json()) as {
+      uuid?: string
+      name?: string
+      summary?: string
+      created_at?: string
+      updated_at?: string
+    }[]
+    if (!Array.isArray(data)) return null
+    const chats: ChatSummary[] = []
+    for (const item of data) {
+      if (!item.uuid) continue
+      const title = (item.name ?? '').trim() || (item.summary ?? '').trim() || 'Untitled chat'
+      const updated = Date.parse(item.updated_at ?? '')
+      chats.push({
+        id: item.uuid,
+        title,
+        updatedAt: Number.isNaN(updated) ? Date.parse(item.created_at ?? '') || null : updated,
+      })
+    }
+    chats.sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0))
+    return chats.length ? chats : null
   } catch {
     return null
   }
@@ -142,13 +179,26 @@ export const claude: PlatformAdapter = {
   },
 
   async readConversation(): Promise<ChatMessage[]> {
-    const viaApi = await readViaApi()
+    const id = conversationId()
+    const viaApi = id ? await fetchConversationById(id) : null
     if (viaApi) return viaApi
     return readViaDom()
   },
 
   readConversationFast(): ChatMessage[] {
     return readViaDom()
+  },
+
+  async listChats(): Promise<ChatSummary[]> {
+    return (await fetchChatList()) ?? []
+  },
+
+  async readConversationById(id: string): Promise<ChatMessage[]> {
+    return (await fetchConversationById(id)) ?? []
+  },
+
+  currentConversationId(): string | null {
+    return conversationId()
   },
 
   async waitForResponse(timeoutMs: number): Promise<string | null> {

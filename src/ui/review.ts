@@ -12,12 +12,17 @@ export interface ReviewOptions {
   autoSend: boolean
   /**
    * 'brief' — normal flow: the AI wrote a handoff brief.
-   * 'handoff' — quota-recovery: locally-built transcript handoff, where the
-   * destination AI digests the conversation as its first act.
+   * 'handoff' — a locally-built transcript handoff, where the destination AI
+   * digests the conversation as its first act. `reason` says why:
+   * 'quota' — the source platform is out of quota (its row is disabled);
+   * 'picked' — the user chose an older chat from the history picker.
    */
   variant?: 'brief' | 'handoff'
+  reason?: 'quota' | 'picked'
   /** Reset hint surfaced by the platform's limit UI, if any. */
   limitResetHint?: string
+  /** Title of the picked source chat (history-picker transfers). */
+  sourceChatTitle?: string
   /** Context-window sizes per destination, for the fit readouts. */
   windows: Record<PlatformId, number>
   onConfirm: (dest: PlatformId, editedText: string, autoSend: boolean) => void
@@ -37,17 +42,22 @@ export function openReview(options: ReviewOptions): ReviewController {
   const { host, root } = createShadowHost('2147483647')
   const variant = options.variant ?? 'brief'
   const isHandoff = variant === 'handoff'
+  const reason = options.reason ?? 'quota'
+  // Only the quota case actually blocks the source platform.
+  const sourceUnavailable = isHandoff && reason === 'quota'
 
   const headerText = isHandoff
     ? {
-        eyebrow: 'QUOTA REACHED',
-        title: 'Continue on another AI',
+        eyebrow: reason === 'quota' ? 'QUOTA REACHED' : 'FRESHCONTEXT',
+        title: reason === 'quota' ? 'Continue on another AI' : 'Transfer this chat',
         briefLabel: 'CONVERSATION HANDOFF — THE DESTINATION AI DIGESTS IT',
+        limitEyebrow: reason === 'quota',
       }
     : {
         eyebrow: 'FRESHCONTEXT',
         title: 'Handoff brief',
         briefLabel: 'BRIEF — EDIT BEFORE CONTINUING',
+        limitEyebrow: false,
       }
 
   const style = document.createElement('style')
@@ -127,7 +137,7 @@ export function openReview(options: ReviewOptions): ReviewController {
 
   // Header
   const eyebrow = document.createElement('div')
-  eyebrow.className = `eyebrow${isHandoff ? ' limit' : ''}`
+  eyebrow.className = `eyebrow${headerText.limitEyebrow ? ' limit' : ''}`
   eyebrow.textContent = headerText.eyebrow
   const title = document.createElement('div')
   title.className = 'title'
@@ -136,7 +146,9 @@ export function openReview(options: ReviewOptions): ReviewController {
   sub.className = 'sub'
   const resetNote = options.limitResetHint ? ` · ${options.limitResetHint}` : ''
   sub.textContent = isHandoff
-    ? `${options.sourceLabel} can't respond right now${resetNote} — carry the conversation to another AI, which digests it and continues.`
+    ? reason === 'quota'
+      ? `${options.sourceLabel} can't respond right now${resetNote} — carry the conversation to another AI, which digests it and continues.`
+      : `"${options.sourceChatTitle ?? 'Conversation'}" — from your history. The destination AI digests the transcript and continues.`
     : `From ${options.sourceLabel} — chat ${Math.round(options.pctFull * 100)}% full`
   panel.append(eyebrow, title, sub)
 
@@ -176,7 +188,7 @@ export function openReview(options: ReviewOptions): ReviewController {
   const rows: DestRow[] = []
   let selected: PlatformId = options.sourcePlatform
   for (const adapter of ADAPTERS) {
-    const unavailable = isHandoff && adapter.id === options.sourcePlatform
+    const unavailable = sourceUnavailable && adapter.id === options.sourcePlatform
     const btn = document.createElement('button')
     btn.className = 'dest'
     const radio = document.createElement('span')
@@ -207,7 +219,7 @@ export function openReview(options: ReviewOptions): ReviewController {
   }
 
   function destSubText(dest: PlatformId, tokens: number): string {
-    if (isHandoff && dest === options.sourcePlatform) return 'quota exhausted'
+    if (sourceUnavailable && dest === options.sourcePlatform) return 'quota exhausted'
     const pct = fitPct(dest, tokens)
     if (pct === null) return adapterForLabel(dest)
     return `${adapterForLabel(dest)} · fills ~${Math.round(pct)}% of a new window`
@@ -220,7 +232,7 @@ export function openReview(options: ReviewOptions): ReviewController {
   function renderDests(): void {
     const tokens = estimateTokens(textarea.value)
     for (const row of rows) {
-      const unavailable = isHandoff && row.id === options.sourcePlatform
+      const unavailable = sourceUnavailable && row.id === options.sourcePlatform
       const pct = fitPct(row.id, tokens)
       row.btn.classList.toggle('selected', row.id === selected)
       row.btn.classList.toggle('unavailable', unavailable)
@@ -236,8 +248,8 @@ export function openReview(options: ReviewOptions): ReviewController {
     }
   }
 
-  // Default destination: in handoff mode the source platform is unavailable.
-  if (isHandoff) {
+  // Default destination: skip the source only when quota blocks it.
+  if (sourceUnavailable) {
     const firstAvailable = ADAPTERS.find((a) => a.id !== options.sourcePlatform)
     if (firstAvailable) selected = firstAvailable.id
   }
@@ -271,7 +283,7 @@ export function openReview(options: ReviewOptions): ReviewController {
   // Actions
   const primary = document.createElement('button')
   primary.className = 'primary'
-  primary.textContent = isHandoff ? 'Open new chat on another AI' : 'Open new chat'
+  primary.textContent = sourceUnavailable ? 'Open new chat on another AI' : 'Open new chat'
   primary.addEventListener('click', () => {
     options.onConfirm(selected, textarea.value, autoSend)
   })
