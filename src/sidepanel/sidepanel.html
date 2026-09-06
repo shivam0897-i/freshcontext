@@ -14,110 +14,173 @@
     * { box-sizing: border-box; }
     body {
       margin: 0; background: var(--bg); color: var(--text);
-      font: 13px/1.5 var(--sans); padding: 18px 20px 32px;
+      font: 13px/1.5 var(--sans); padding: 18px 20px 28px;
     }
     .eyebrow { font: 500 9px var(--mono); letter-spacing: 1.2px; color: var(--faint); }
     h1 { font-size: 16px; font-weight: 600; letter-spacing: -0.2px; margin: 4px 0 2px; }
-    .sub { font-size: 11px; color: var(--muted); margin: 0 0 18px; }
-    .label { font: 500 9px var(--mono); letter-spacing: 1.2px; color: var(--faint); margin: 18px 0 8px; }
+    .sub { font-size: 11px; color: var(--muted); margin: 0 0 6px; }
+    .saved { font: 500 9px var(--mono); letter-spacing: 1px; color: var(--green); height: 14px; margin: 0 0 8px; opacity: 0; transition: opacity .25s; }
+    .saved.show { opacity: 1; }
+
+    .label { font: 500 9px var(--mono); letter-spacing: 1.2px; color: var(--faint); margin: 16px 0 8px; }
     .card {
       background: var(--card); border: 1px solid var(--border);
-      border-radius: var(--radius); padding: 12px;
+      border-radius: var(--radius); padding: 4px 12px;
     }
-    .row { display: flex; gap: 10px; align-items: center; justify-content: space-between; padding: 6px 0; }
+    .row { display: flex; gap: 10px; align-items: center; justify-content: space-between; padding: 9px 0; }
     .row + .row { border-top: 1px solid var(--border); }
-    .row .name { font-size: 12px; }
-    .row .hint { font-size: 10px; color: var(--faint); }
+    .row .name { font-size: 12.5px; }
+    .row .hint { font-size: 10.5px; color: var(--faint); margin-top: 1px; }
+    .grow { min-width: 0; }
+
+    .switch { width: 28px; height: 16px; border-radius: 8px; background: #2e2e33; border: 1px solid var(--border); position: relative; flex: none; cursor: pointer; }
+    .switch .knob { position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%; background: var(--muted); transition: left .15s ease; }
+    .switch.on { background: #3a3a41; }
+    .switch.on .knob { left: 14px; background: #fff; }
+
+    select {
+      background: var(--bg); color: var(--text); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 6px 8px; font: 11px var(--mono);
+      outline: none; max-width: 172px;
+    }
+    select:focus { border-color: var(--border-bright); }
     input[type="number"] {
-      width: 90px; background: var(--bg); color: var(--text);
+      width: 84px; background: var(--bg); color: var(--text);
       border: 1px solid var(--border); border-radius: var(--radius);
       padding: 6px 8px; font: 11px var(--mono); outline: none;
     }
     input[type="number"]:focus { border-color: var(--border-bright); }
     textarea {
-      width: 100%; min-height: 140px; background: var(--bg); color: var(--text);
+      width: 100%; min-height: 150px; background: var(--bg); color: var(--text);
       border: 1px solid var(--border); border-radius: var(--radius);
-      padding: 10px; font: 11px/1.5 var(--sans); outline: none; resize: vertical;
+      padding: 10px; font: 11px/1.5 var(--sans); outline: none; resize: vertical; margin-top: 8px;
     }
     textarea:focus { border-color: var(--border-bright); }
-    .switch { width: 28px; height: 16px; border-radius: 8px; background: #2e2e33; border: 1px solid var(--border); position: relative; flex: none; }
-    .switch .knob { position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%; background: var(--muted); transition: left .15s ease; }
-    .switch.on { background: #3a3a41; }
-    .switch.on .knob { left: 14px; background: var(--white, #fff); }
-    button {
-      font: 600 12px var(--sans); color: #0a0a0b; background: #fff;
-      border: none; border-radius: var(--radius); padding: 9px 16px; cursor: pointer;
+
+    .segmented { display: flex; gap: 6px; padding: 10px 0 0; }
+    .segmented button {
+      flex: 1; padding: 8px 0; font: 600 11.5px var(--sans); color: var(--muted);
+      background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius);
+      cursor: pointer;
     }
-    button:hover { opacity: .92; }
-    button.ghost { background: none; color: var(--muted); border: 1px solid var(--border); }
-    .brief { padding: 10px 12px; }
-    .brief + .brief { margin-top: 8px; }
+    .segmented button.active { background: #fff; color: #0a0a0b; border-color: #fff; }
+    .preset-hint { font-size: 10.5px; color: var(--faint); padding: 8px 0 10px; min-height: 16px; }
+
+    details { border-top: 1px solid var(--border); margin-top: 18px; padding-top: 12px; }
+    details summary {
+      font: 500 9px var(--mono); letter-spacing: 1.2px; color: var(--faint);
+      cursor: pointer; list-style: none; display: flex; justify-content: space-between;
+    }
+    details summary::-webkit-details-marker { display: none; }
+    details summary::after { content: '+'; color: var(--faint); }
+    details[open] summary::after { content: '–'; }
+
+    .actions { display: flex; gap: 8px; margin-top: 10px; }
+    button.ghost {
+      font: 500 11px var(--sans); color: var(--muted); background: none;
+      border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 7px 12px; cursor: pointer;
+    }
+    button.ghost:hover { color: var(--text); border-color: var(--border-bright); }
+    button.danger { color: var(--red); }
+
+    .brief { padding: 10px 0; }
     .brief .head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
     .brief .meta { font: 500 9px var(--mono); letter-spacing: .8px; color: var(--faint); }
     .brief .preview {
-      font-size: 11px; color: var(--muted); margin: 6px 0 8px;
+      font-size: 11px; color: var(--muted); margin: 6px 0 0;
       display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
     }
     .brief button { padding: 5px 10px; font-size: 11px; }
-    .saved-note { font: 500 9px var(--mono); letter-spacing: 1px; color: var(--green); margin-top: 10px; min-height: 12px; }
-    .empty { font-size: 11px; color: var(--faint); }
+    .empty { font-size: 11px; color: var(--faint); padding: 10px 0; }
+
+    footer {
+      margin-top: 22px; padding-top: 12px; border-top: 1px solid var(--border);
+      font: 500 9px var(--mono); letter-spacing: .8px; color: var(--faint);
+      display: flex; justify-content: space-between; gap: 10px;
+    }
+    footer a { color: var(--muted); text-decoration: none; }
+    footer a:hover { color: var(--text); }
   </style>
 </head>
 <body>
   <div class="eyebrow">FRESHCONTEXT</div>
   <h1>Settings</h1>
-  <p class="sub">Local only — nothing leaves this browser.</p>
+  <p class="sub">Everything stays on this device. Changes save automatically.</p>
+  <div class="saved" id="saved">SAVED</div>
 
-  <div class="label">CONTEXT WINDOW SIZES (TOKENS)</div>
+  <div class="label">GENERAL</div>
   <div class="card">
     <div class="row">
-      <div><div class="name">ChatGPT</div><div class="hint">~16K free · ~32K Plus · ~128K Pro</div></div>
-      <input type="number" id="win-chatgpt" min="1000" step="1000" />
+      <div class="grow">
+        <div class="name">Show the context badge</div>
+        <div class="hint">The floating chip on chat pages</div>
+      </div>
+      <button class="switch" id="badgeVisible" aria-label="Toggle badge"><span class="knob"></span></button>
     </div>
     <div class="row">
-      <div><div class="name">Claude</div><div class="hint">200K default · up to 1M on new models</div></div>
-      <input type="number" id="win-claude" min="1000" step="1000" />
+      <div class="grow">
+        <div class="name">Send handoff automatically</div>
+        <div class="hint">Off is recommended — you review and press Enter</div>
+      </div>
+      <button class="switch" id="autoSend" aria-label="Toggle auto-send"><span class="knob"></span></button>
     </div>
     <div class="row">
-      <div><div class="name">Gemini</div><div class="hint">32K free · 128K Plus · 1M Pro</div></div>
-      <input type="number" id="win-gemini" min="1000" step="1000" />
+      <div class="grow">
+        <div class="name">Badge position</div>
+        <div class="hint">Drag the badge to move it; this puts it back</div>
+      </div>
+      <button class="ghost" id="resetBadgePos">Reset</button>
     </div>
   </div>
+
+  <div class="label">PLATFORMS</div>
+  <div class="card" id="platforms"></div>
+  <p class="sub" style="margin-top:6px;">Turning a platform off takes effect after you reload its tabs.</p>
 
   <div class="label">WARNINGS</div>
   <div class="card">
-    <div class="row">
-      <div><div class="name">Amber threshold</div><div class="hint">0–100% of window</div></div>
-      <input type="number" id="thr-amber" min="10" max="99" step="1" />
-    </div>
-    <div class="row">
-      <div><div class="name">Red threshold</div><div class="hint">0–100% of window</div></div>
-      <input type="number" id="thr-red" min="11" max="100" step="1" />
-    </div>
+    <div class="segmented" id="warningPresets"></div>
+    <div class="preset-hint" id="warningHint"></div>
   </div>
 
-  <div class="label">BEHAVIOR</div>
-  <div class="card">
-    <div class="row">
-      <div>
-        <div class="name">Send automatically after inserting</div>
-        <div class="hint">Off is recommended — you review and press Enter</div>
+  <details id="advanced">
+    <summary>ADVANCED</summary>
+
+    <div class="label">CUSTOM WARNING THRESHOLDS</div>
+    <div class="card">
+      <div class="row">
+        <div class="grow"><div class="name">Amber at</div><div class="hint">Percent of the context window</div></div>
+        <input type="number" id="thrAmber" min="10" max="99" step="1" />
       </div>
-      <button class="switch" id="autosend" aria-label="Toggle auto-send"><span class="knob"></span></button>
+      <div class="row">
+        <div class="grow"><div class="name">Red at</div><div class="hint">Must be above amber</div></div>
+        <input type="number" id="thrRed" min="11" max="100" step="1" />
+      </div>
     </div>
+
+    <div class="label">BRIEF REQUEST PROMPT</div>
+    <p class="sub" style="margin:0;">What the AI is asked to write when you press Fresh start. Edit only if the default doesn't suit you.</p>
+    <textarea id="prompt"></textarea>
+    <div class="actions">
+      <button class="ghost" id="resetPrompt">Restore default prompt</button>
+    </div>
+  </details>
+
+  <div class="label">HANDOFF HISTORY</div>
+  <div class="card" id="briefs"></div>
+  <div class="actions">
+    <button class="ghost danger" id="clearBriefs">Clear all handoffs</button>
   </div>
 
-  <div class="label">BRIEF REQUEST PROMPT</div>
-  <textarea id="prompt"></textarea>
-
-  <div style="margin-top: 14px; display: flex; gap: 8px;">
-    <button id="save">Save settings</button>
-    <button class="ghost" id="reset">Reset to defaults</button>
-  </div>
-  <div class="saved-note" id="saved-note"></div>
-
-  <div class="label">SAVED BRIEFS (LAST 20)</div>
-  <div id="briefs"></div>
+  <footer>
+    <span id="version"></span>
+    <span>
+      <a href="https://github.com/shivam0897-i/freshcontext" target="_blank" rel="noreferrer">GITHUB</a>
+      &nbsp;·&nbsp;
+      <a href="https://github.com/shivam0897-i/freshcontext/issues" target="_blank" rel="noreferrer">REPORT AN ISSUE</a>
+    </span>
+  </footer>
 
   <script src="sidepanel.js"></script>
 </body>

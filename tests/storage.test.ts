@@ -42,6 +42,8 @@ describe('settings', () => {
     expect(s.windows.chatgpt).toBe(32_000)
     expect(s.promptTemplate).toBe(DEFAULT_PROMPT)
     expect(s.autoSend).toBe(false)
+    expect(s.badgeVisible).toBe(true)
+    expect(s.enabledPlatforms).toEqual({ chatgpt: true, claude: true, gemini: true })
   })
 
   it('merges partial patches with defaults', async () => {
@@ -49,6 +51,18 @@ describe('settings', () => {
     const s = await getSettings()
     expect(s.windows.chatgpt).toBe(128_000)
     expect(s.thresholds.red).toBe(0.85) // untouched default survives
+  })
+
+  it('keeps new fields defaulted when stored settings predate them', async () => {
+    // Simulates an upgrade from a version without badgeVisible/enabledPlatforms.
+    await chrome.storage.local.set({
+      settings: { autoSend: true, thresholds: { amber: 0.8, red: 0.9 } },
+    })
+    const s = await getSettings()
+    expect(s.autoSend).toBe(true)
+    expect(s.thresholds.amber).toBe(0.8)
+    expect(s.badgeVisible).toBe(true)
+    expect(s.enabledPlatforms.claude).toBe(true)
   })
 })
 

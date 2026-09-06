@@ -7,6 +7,10 @@ export interface Settings {
   windows: Record<PlatformId, number>
   autoSend: boolean
   promptTemplate: string
+  /** Master switch for the floating badge. */
+  badgeVisible: boolean
+  /** Per-platform kill switch — a platform set to false is fully inert. */
+  enabledPlatforms: Record<PlatformId, boolean>
 }
 
 export interface PendingBrief {
@@ -28,6 +32,8 @@ const DEFAULT_SETTINGS: Settings = {
   windows: { ...DEFAULT_WINDOWS },
   autoSend: false,
   promptTemplate: DEFAULT_PROMPT,
+  badgeVisible: true,
+  enabledPlatforms: { chatgpt: true, claude: true, gemini: true },
 }
 
 export async function getSettings(): Promise<Settings> {
@@ -38,6 +44,7 @@ export async function getSettings(): Promise<Settings> {
     ...s,
     thresholds: { ...DEFAULT_SETTINGS.thresholds, ...(s.thresholds ?? {}) },
     windows: { ...DEFAULT_SETTINGS.windows, ...(s.windows ?? {}) },
+    enabledPlatforms: { ...DEFAULT_SETTINGS.enabledPlatforms, ...(s.enabledPlatforms ?? {}) },
     promptTemplate: s.promptTemplate?.trim() ? s.promptTemplate : DEFAULT_PROMPT,
   }
 }

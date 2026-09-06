@@ -10,6 +10,10 @@ export interface BadgeController {
   reset(): void
   /** Surface the platform's limit status inside the expanded card. */
   setLimit(info: LimitInfo | null): void
+  /** Show/hide the whole badge (settings master switch). */
+  setVisible(visible: boolean): void
+  /** Return the badge to its default bottom-right position. */
+  resetPosition(): void
 }
 
 export interface BadgeOptions {
@@ -362,6 +366,14 @@ export function mountBadge(options: BadgeOptions): BadgeController {
     setLimit(info: LimitInfo | null) {
       limitInfo = info
       renderLimit()
+    },
+    setVisible(visible: boolean) {
+      host.style.display = visible ? '' : 'none'
+    },
+    resetPosition() {
+      const pos = defaultPosition()
+      anchor.style.left = `${pos.left}px`
+      anchor.style.top = `${pos.top}px`
     },
   }
 }

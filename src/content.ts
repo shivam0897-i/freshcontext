@@ -72,6 +72,9 @@ async function main(): Promise<void> {
   const settings = await getSettings()
   const toast = mountToast()
 
+  // Per-platform kill switch: a disabled platform is fully inert.
+  if (settings.enabledPlatforms[adapter.id] === false) return
+
   let meter: ReturnType<typeof startMeter> | null = null
   const badge = mountBadge({
     onFreshStart: () => {
@@ -87,13 +90,22 @@ async function main(): Promise<void> {
       void adapter.readLimits().then((info) => badge.setLimit(info))
     },
   })
+  badge.setVisible(settings.badgeVisible)
 
   meter = startMeter(adapter, badge, settings)
 
-  // Settings changed in the side panel apply immediately — no tab reload.
+  // Settings changed in the side panel apply immediately — no tab reload
+  // (platform toggles are the exception; they take effect on next load).
   chrome.storage.onChanged.addListener((changes, area) => {
-    if (area === 'local' && changes['settings']) {
-      void getSettings().then((next) => meter?.updateSettings(next))
+    if (area !== 'local') return
+    if (changes['settings']) {
+      void getSettings().then((next) => {
+        meter?.updateSettings(next)
+        badge.setVisible(next.badgeVisible)
+      })
+    }
+    if (changes['badgePos'] && changes['badgePos'].newValue === undefined) {
+      badge.resetPosition()
     }
   })
 

@@ -25,7 +25,7 @@ FreshContext gives you a third option: **one click asks the AI to write a struct
 
 - **The badge** shows how full the conversation's context window is: green → amber (~70%) → red (~85%). Click it for details.
 - **Fresh start** — the button injects the brief request into your current chat, waits for the AI to write it, then shows a review overlay where you can edit the brief, pick a destination (same platform, or ChatGPT/Claude/Gemini), and continue. The brief is **saved locally and copied to your clipboard automatically** before anything navigates — you can never lose it.
-- **Side panel** (toolbar icon): set your plan's context-window sizes, warning thresholds, the brief-request prompt, auto-send behavior, and revisit your last 20 briefs.
+- **Side panel** (toolbar icon): pick your plan per platform (Free/Plus/Pro — no token numbers to research), choose warning sensitivity (Relaxed/Balanced/Strict), toggle the badge and auto-send per platform, and revisit or clear your handoff history. Everything saves on change — there is no Save button to forget.
 - **Auto-send is off by default** — the brief lands in the composer and you press Enter. Automation you can see and control.
 
 ## Offline demo harness
