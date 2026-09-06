@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>FreshContext</title>
+  <style>
+    :root {
+      --bg: #0a0a0b; --card: #131314; --border: #26262a; --border-bright: #4d4d55;
+      --text: #f2f2f3; --muted: #a0a0a8; --faint: #6e6e76;
+      --green: #4caf82; --amber: #d6a335; --red: #e06c5e; --radius: 8px;
+      --mono: ui-monospace, "SF Mono", "Cascadia Code", Consolas, "Roboto Mono", monospace;
+      --sans: Inter, "Segoe UI", system-ui, -apple-system, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; background: var(--bg); color: var(--text);
+      font: 13px/1.5 var(--sans); padding: 18px 20px 32px;
+    }
+    .eyebrow { font: 500 9px var(--mono); letter-spacing: 1.2px; color: var(--faint); }
+    h1 { font-size: 16px; font-weight: 600; letter-spacing: -0.2px; margin: 4px 0 2px; }
+    .sub { font-size: 11px; color: var(--muted); margin: 0 0 18px; }
+    .label { font: 500 9px var(--mono); letter-spacing: 1.2px; color: var(--faint); margin: 18px 0 8px; }
+    .card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 12px;
+    }
+    .row { display: flex; gap: 10px; align-items: center; justify-content: space-between; padding: 6px 0; }
+    .row + .row { border-top: 1px solid var(--border); }
+    .row .name { font-size: 12px; }
+    .row .hint { font-size: 10px; color: var(--faint); }
+    input[type="number"] {
+      width: 90px; background: var(--bg); color: var(--text);
+      border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 6px 8px; font: 11px var(--mono); outline: none;
+    }
+    input[type="number"]:focus { border-color: var(--border-bright); }
+    textarea {
+      width: 100%; min-height: 140px; background: var(--bg); color: var(--text);
+      border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 10px; font: 11px/1.5 var(--sans); outline: none; resize: vertical;
+    }
+    textarea:focus { border-color: var(--border-bright); }
+    .switch { width: 28px; height: 16px; border-radius: 8px; background: #2e2e33; border: 1px solid var(--border); position: relative; flex: none; }
+    .switch .knob { position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%; background: var(--muted); transition: left .15s ease; }
+    .switch.on { background: #3a3a41; }
+    .switch.on .knob { left: 14px; background: var(--white, #fff); }
+    button {
+      font: 600 12px var(--sans); color: #0a0a0b; background: #fff;
+      border: none; border-radius: var(--radius); padding: 9px 16px; cursor: pointer;
+    }
+    button:hover { opacity: .92; }
+    button.ghost { background: none; color: var(--muted); border: 1px solid var(--border); }
+    .brief { padding: 10px 12px; }
+    .brief + .brief { margin-top: 8px; }
+    .brief .head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+    .brief .meta { font: 500 9px var(--mono); letter-spacing: .8px; color: var(--faint); }
+    .brief .preview {
+      font-size: 11px; color: var(--muted); margin: 6px 0 8px;
+      display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+    }
+    .brief button { padding: 5px 10px; font-size: 11px; }
+    .saved-note { font: 500 9px var(--mono); letter-spacing: 1px; color: var(--green); margin-top: 10px; min-height: 12px; }
+    .empty { font-size: 11px; color: var(--faint); }
+  </style>
+</head>
+<body>
+  <div class="eyebrow">FRESHCONTEXT</div>
+  <h1>Settings</h1>
+  <p class="sub">Local only — nothing leaves this browser.</p>
+
+  <div class="label">CONTEXT WINDOW SIZES (TOKENS)</div>
+  <div class="card">
+    <div class="row">
+      <div><div class="name">ChatGPT</div><div class="hint">~16K free · ~32K Plus · ~128K Pro</div></div>
+      <input type="number" id="win-chatgpt" min="1000" step="1000" />
+    </div>
+    <div class="row">
+      <div><div class="name">Claude</div><div class="hint">200K default · up to 1M on new models</div></div>
+      <input type="number" id="win-claude" min="1000" step="1000" />
+    </div>
+    <div class="row">
+      <div><div class="name">Gemini</div><div class="hint">32K free · 128K Plus · 1M Pro</div></div>
+      <input type="number" id="win-gemini" min="1000" step="1000" />
+    </div>
+  </div>
+
+  <div class="label">WARNINGS</div>
+  <div class="card">
+    <div class="row">
+      <div><div class="name">Amber threshold</div><div class="hint">0–100% of window</div></div>
+      <input type="number" id="thr-amber" min="10" max="99" step="1" />
+    </div>
+    <div class="row">
+      <div><div class="name">Red threshold</div><div class="hint">0–100% of window</div></div>
+      <input type="number" id="thr-red" min="11" max="100" step="1" />
+    </div>
+  </div>
+
+  <div class="label">BEHAVIOR</div>
+  <div class="card">
+    <div class="row">
+      <div>
+        <div class="name">Send automatically after inserting</div>
+        <div class="hint">Off is recommended — you review and press Enter</div>
+      </div>
+      <button class="switch" id="autosend" aria-label="Toggle auto-send"><span class="knob"></span></button>
+    </div>
+  </div>
+
+  <div class="label">BRIEF REQUEST PROMPT</div>
+  <textarea id="prompt"></textarea>
+
+  <div style="margin-top: 14px; display: flex; gap: 8px;">
+    <button id="save">Save settings</button>
+    <button class="ghost" id="reset">Reset to defaults</button>
+  </div>
+  <div class="saved-note" id="saved-note"></div>
+
+  <div class="label">SAVED BRIEFS (LAST 20)</div>
+  <div id="briefs"></div>
+
+  <script src="sidepanel.js"></script>
+</body>
+</html>
