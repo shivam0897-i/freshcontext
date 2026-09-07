@@ -6,3 +6,5 @@ docs/superpowers/
 .tools/
 *.zip
 *.log
+promo/Screenshot*.png
+promo/screenshot-*.png
