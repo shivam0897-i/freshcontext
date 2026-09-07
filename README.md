@@ -82,7 +82,7 @@ src/
 ## Development
 
 ```bash
-npm test          # 63 unit tests (Vitest + jsdom): estimator calibration vs the
+npm test          # 79 unit tests (Vitest + jsdom): estimator calibration vs the
                   # real tokenizer, brief parsing, meter thresholds, adapter DOM
                   # contracts, storage round-trips
 npm run build     # production → dist/
