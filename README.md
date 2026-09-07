@@ -77,6 +77,7 @@ src/
 - No servers, no accounts, no analytics, no telemetry. Conversation text never leaves the browser.
 - Reads only the three chat sites declared in host_permissions, only for the features above.
 - The brief is stored in `chrome.storage.local` on your machine and cleared when you discard it.
+- Full privacy policy: [PRIVACY.md](PRIVACY.md)
 
 ## Development
 
