@@ -77,6 +77,60 @@ describe('anti-fluctuation (virtualized tails must not downgrade the reading)', 
 
   it('anchors growth to the baseline: exact baseline + estimated delta', () => {
     const h = harness()
+    // Distinct texts: m0..m9, then two genuinely new messages appended.
+    const base = h.msgs(10).map((m, i) => ({ ...m, text: `m${i} ` + m.text }))
+    const grown = [...base, h.msg('new question'), h.msg('new answer')]
+    h.engine.dispatch({ type: 'snapshot', url: 'u1', messages: base })
+    h.engine.dispatch({ type: 'fullRead', readId: 1, url: 'u1', messages: base, tokens: 1000, exact: true })
+    h.engine.dispatch({ type: 'snapshot', url: 'u1', messages: grown })
+    expect(h.last().tokens).toBeGreaterThan(1000) // baseline + the two new messages
+    expect(h.last().tokens).toBeLessThan(1400) // ...but NOT double-counting the base
+    expect(h.last().messages).toBe(12)
+    expect(h.last().exact).toBe(false) // anchored, but the delta is an estimate
+  })
+
+  it('virtualization window: older messages loading into the DOM do NOT count as growth', () => {
+    // Gemini: scrolling up prepends older messages. live becomes longer than
+    // the baseline, but its LAST message is unchanged — nothing is new.
+    const h = harness()
+    const base = h.msgs(10).map((m, i) => ({ ...m, text: `m${i} ` + m.text }))
+    const scrolled = [h.msg('older-1', 'user'), h.msg('older-2', 'assistant'), ...base]
+    h.engine.dispatch({ type: 'snapshot', url: 'u1', messages: base })
+    h.engine.dispatch({ type: 'fullRead', readId: 1, url: 'u1', messages: base, tokens: 1000, exact: true })
+    h.engine.dispatch({ type: 'snapshot', url: 'u1', messages: scrolled })
+    expect(h.last().tokens).toBe(1000) // no double-count: the prepended messages are already in the baseline
+    expect(h.last().messages).toBe(10)
+    expect(h.last().exact).toBe(true)
+  })
+
+  it('virtualization window + genuine growth: only the appended message is counted', () => {
+    const h = harness()
+    const base = h.msgs(10).map((m, i) => ({ ...m, text: `m${i} ` + m.text }))
+    const scrolledAndGrown = [
+      h.msg('older-1', 'user'),
+      ...base,
+      h.msg('x'.repeat(450), 'assistant'), // exactly 100 heuristic tokens
+    ]
+    h.engine.dispatch({ type: 'snapshot', url: 'u1', messages: base })
+    h.engine.dispatch({ type: 'fullRead', readId: 1, url: 'u1', messages: base, tokens: 1000, exact: true })
+    h.engine.dispatch({ type: 'snapshot', url: 'u1', messages: scrolledAndGrown })
+    expect(h.last().tokens).toBe(1100) // exactly one new heuristic message
+    expect(h.last().messages).toBe(11)
+  })
+
+  it('anchor evicted from the DOM (deep scroll): holds the baseline, never guesses', () => {
+    const h = harness()
+    const base = h.msgs(10).map((m, i) => ({ ...m, text: `m${i} ` + m.text }))
+    const deepScroll = [h.msg('ancient-1', 'user'), h.msg('ancient-2', 'assistant')]
+    h.engine.dispatch({ type: 'snapshot', url: 'u1', messages: base })
+    h.engine.dispatch({ type: 'fullRead', readId: 1, url: 'u1', messages: base, tokens: 1000, exact: true })
+    h.engine.dispatch({ type: 'snapshot', url: 'u1', messages: deepScroll })
+    expect(h.last().tokens).toBe(1000)
+    expect(h.last().messages).toBe(10)
+  })
+
+  it('duplicate-text growth holds the baseline until the full read corrects it (stability over liveness)', () => {
+    const h = harness()
     h.engine.dispatch({ type: 'snapshot', url: 'u1', messages: h.msgs(10) })
     h.engine.dispatch({
       type: 'fullRead',
@@ -86,11 +140,13 @@ describe('anti-fluctuation (virtualized tails must not downgrade the reading)', 
       tokens: 1000,
       exact: true,
     })
-    // Two new messages beyond the baseline: 1000 + 2×100 estimated.
+    // All messages share identical text: the anchor cannot distinguish the
+    // appended copies from the original, so the display holds the baseline
+    // (no fluctuation) and the next full read re-baselines.
     h.engine.dispatch({ type: 'snapshot', url: 'u1', messages: h.msgs(12) })
+    expect(h.last().tokens).toBe(1000)
+    h.engine.dispatch({ type: 'fullRead', readId: 2, url: 'u1', messages: h.msgs(12), tokens: 1200, exact: true })
     expect(h.last().tokens).toBe(1200)
-    expect(h.last().messages).toBe(12)
-    expect(h.last().exact).toBe(false) // anchored, but the delta is an estimate
   })
 
   it('re-baselines to exact after the next full read of a grown conversation', () => {

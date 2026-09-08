@@ -62,12 +62,22 @@ function readViaDom(): ChatMessage[] {
  * Gemini virtualizes long chats — only rendered messages exist in the DOM.
  * Scroll upward until the message count stabilizes (gemini-chat-exporter's
  * pattern: up to 40 attempts, stop after the count stops growing).
+ *
+ * Respect for the viewport: if the user is deliberately reading history
+ * (scrolled away from the bottom), the read is skipped this round —
+ * hijacking their scroll position to load messages is worse than a
+ * momentarily stale baseline, and the next read completes once they're
+ * back at the bottom. When the load does run, it ends by restoring the
+ * bottom, where chat users almost always are.
  */
 async function scrollToLoadAll(): Promise<void> {
   const container = HISTORY_CONTAINERS.map((s) => document.querySelector(s)).find(Boolean) as
     | HTMLElement
     | undefined
   if (!container) return
+  const distanceFromBottom =
+    container.scrollHeight - container.scrollTop - container.clientHeight
+  if (distanceFromBottom > 120) return // user is reading history — don't touch the scroll
   let previousCount = -1
   for (let i = 0; i < 40; i++) {
     const count = document.querySelectorAll('user-query, model-response').length
@@ -76,6 +86,7 @@ async function scrollToLoadAll(): Promise<void> {
     container.scrollTop = 0
     await sleep(250)
   }
+  container.scrollTop = container.scrollHeight
 }
 
 function lastAssistantText(): string | null {

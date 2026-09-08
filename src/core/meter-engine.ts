@@ -185,10 +185,50 @@ export function createMeterEngine(
       return
     }
 
-    // Conversation grew: baseline + estimated delta for the newest messages.
-    // The rendered DOM is suffix-aligned, so the newest
-    // (live − baseline) messages are the ones added since the full read.
-    const deltaMessages = live.messages.slice(best.messages.length)
+    // Conversation grew: baseline + estimated delta for whatever follows the
+    // baseline's last message in the live DOM.
+    //
+    // The delta is ANCHORED, not length-derived: Gemini's virtualization is
+    // a window, not a suffix — scrolling up loads older messages into the
+    // DOM, which also makes live longer than the baseline. A bare
+    // live.slice(best.length) would count those already-included messages as
+    // new growth (double-count) and the number would swing with the scroll
+    // position. Anchoring on the last occurrence of the baseline's final
+    // message makes prepended content shift the anchor deeper WITHOUT adding
+    // to the delta; only messages after it are new.
+    //
+    // Ambiguity note: when new messages carry the exact same text as the
+    // baseline's last message (retries, "ok"), the last occurrence is that
+    // new message itself and the delta reads empty — the display holds the
+    // baseline until the next full read re-baselines seconds later.
+    // Stability is deliberately preferred over a momentarily live number:
+    // the full read is the truth; the delta is only the between-reads
+    // estimate.
+    const lastBest = best.messages[best.messages.length - 1]
+    let anchorIndex = -1
+    if (lastBest) {
+      for (let i = live.messages.length - 1; i >= 0; i--) {
+        if (live.messages[i]?.text === lastBest.text) {
+          anchorIndex = i
+          break
+        }
+      }
+    }
+    const deltaMessages = anchorIndex >= 0 ? live.messages.slice(anchorIndex + 1) : []
+    if (deltaMessages.length === 0) {
+      // Nothing new follows the anchor: either nothing was appended, or the
+      // anchor was evicted from the DOM entirely (deep scroll) — either way
+      // the baseline is the honest display until the next full read.
+      const baselineState = computeState(
+        best.messages,
+        settings.windowSize,
+        best.exact ? best.tokens : null,
+        settings.thresholds,
+      )
+      baselineState.windowLabel = settings.windowLabel
+      emit(baselineState)
+      return
+    }
     const deltaTokens = deltaMessages.reduce((n, m) => n + estimateTokens(m.text), 0)
     const tokens = best.tokens + deltaTokens
     const pct = settings.windowSize > 0 ? Math.min(1, tokens / settings.windowSize) : 0
@@ -199,7 +239,7 @@ export function createMeterEngine(
       windowLabel: settings.windowLabel,
       pct,
       level: classify(pct, settings.thresholds),
-      messages: live.messages.length,
+      messages: best.messages.length + deltaMessages.length,
       measuring: false,
     })
   }
