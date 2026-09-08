@@ -109,15 +109,18 @@ describe('claude history capabilities', () => {
     document.cookie = 'lastActiveOrg=org-1'
   })
 
-  it('lists chats from the top-level array with name/summary fallbacks', async () => {
+  it('lists chats from the v2 endpoint (data-wrapped) that the app itself uses', async () => {
     stubFetch([
       {
-        pattern: '/api/organizations/org-1/chat_conversations',
-        body: [
-          { uuid: 'u1', name: 'Dashboard work', updated_at: '2026-09-05T10:00:00Z' },
-          { uuid: 'u2', name: '', summary: 'CSV import debugging', created_at: '2026-09-06T10:00:00Z' },
-          { uuid: 'u3', name: '', summary: '', created_at: '2026-09-01T10:00:00Z' },
-        ],
+        pattern: '/api/organizations/org-1/chat_conversations_v2',
+        body: {
+          data: [
+            { uuid: 'u1', name: 'Dashboard work', updated_at: '2026-09-05T10:00:00Z' },
+            { uuid: 'u2', name: '', summary: 'CSV import debugging', created_at: '2026-09-06T10:00:00Z' },
+            { uuid: 'u3', name: '', summary: '', created_at: '2026-09-01T10:00:00Z' },
+          ],
+          has_more: true,
+        },
       },
     ])
     const chats = await claude.listChats!()
@@ -125,6 +128,20 @@ describe('claude history capabilities', () => {
     expect(chats[0]?.title).toBe('CSV import debugging') // summary fallback
     expect(chats[1]?.title).toBe('Dashboard work')
     expect(chats[2]?.title).toBe('Untitled chat') // final fallback
+  })
+
+  it('falls back to the v1 bare-array endpoint when v2 is unavailable', async () => {
+    stubFetch([
+      { pattern: 'chat_conversations_v2', body: {}, status: 404 },
+      {
+        pattern: '/api/organizations/org-1/chat_conversations',
+        body: [
+          { uuid: 'v1-chat', name: 'From v1', updated_at: '2026-09-07T10:00:00Z' },
+        ],
+      },
+    ])
+    const chats = await claude.listChats!()
+    expect(chats.map((c) => c.id)).toEqual(['v1-chat'])
   })
 
   it('captures the conversation model for API-first detection', async () => {

@@ -118,14 +118,42 @@ async function fetchConversationById(id: string): Promise<ChatMessage[] | null> 
 }
 
 /**
- * The history list: GET /api/organizations/{org}/chat_conversations returns
- * a top-level JSON array of conversations (uuid, name, summary, timestamps).
- * Names can be empty — summary then title fallback keeps rows readable.
+ * The history list. The app calls the v2 endpoint exclusively (verified in
+ * live captures): GET /api/organizations/{org}/chat_conversations_v2 returns
+ * { data: [...], has_more } where items carry uuid, name, summary,
+ * timestamps. The v1 endpoint (bare array) is kept as a fallback in case
+ * v2 is unavailable. Names can be empty — summary then title fallback keeps
+ * rows readable.
  */
 async function fetchChatList(): Promise<ChatSummary[] | null> {
+  const orgId = readCookie('lastActiveOrg')
+  if (!orgId) return null
+
+  // v2: the current endpoint the app itself uses.
   try {
-    const orgId = readCookie('lastActiveOrg')
-    if (!orgId) return null
+    const res = await fetch(
+      `/api/organizations/${orgId}/chat_conversations_v2?limit=30&offset=0`,
+      { credentials: 'include' },
+    )
+    if (res.ok) {
+      const data = (await res.json()) as {
+        data?: {
+          uuid?: string
+          name?: string
+          summary?: string
+          created_at?: string
+          updated_at?: string
+        }[]
+      }
+      const chats = parseConversationList(data?.data)
+      if (chats) return chats
+    }
+  } catch {
+    // fall through to v1
+  }
+
+  // v1: the older bare-array endpoint, as a fallback.
+  try {
     const res = await fetch(`/api/organizations/${orgId}/chat_conversations`, {
       credentials: 'include',
     })
@@ -137,23 +165,31 @@ async function fetchChatList(): Promise<ChatSummary[] | null> {
       created_at?: string
       updated_at?: string
     }[]
-    if (!Array.isArray(data)) return null
-    const chats: ChatSummary[] = []
-    for (const item of data) {
-      if (!item.uuid) continue
-      const title = (item.name ?? '').trim() || (item.summary ?? '').trim() || 'Untitled chat'
-      const updated = Date.parse(item.updated_at ?? '')
-      chats.push({
-        id: item.uuid,
-        title,
-        updatedAt: Number.isNaN(updated) ? Date.parse(item.created_at ?? '') || null : updated,
-      })
-    }
-    chats.sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0))
-    return chats.length ? chats : null
+    return parseConversationList(data)
   } catch {
     return null
   }
+}
+
+function parseConversationList(
+  items:
+    | { uuid?: string; name?: string; summary?: string; created_at?: string; updated_at?: string }[]
+    | undefined,
+): ChatSummary[] | null {
+  if (!Array.isArray(items)) return null
+  const chats: ChatSummary[] = []
+  for (const item of items) {
+    if (!item.uuid) continue
+    const title = (item.name ?? '').trim() || (item.summary ?? '').trim() || 'Untitled chat'
+    const updated = Date.parse(item.updated_at ?? '')
+    chats.push({
+      id: item.uuid,
+      title,
+      updatedAt: Number.isNaN(updated) ? Date.parse(item.created_at ?? '') || null : updated,
+    })
+  }
+  chats.sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0))
+  return chats.length ? chats : null
 }
 
 export const claude: PlatformAdapter = {
