@@ -4,7 +4,7 @@ Add-Type -AssemblyName System.Drawing
 
 New-Item -ItemType Directory -Force -Path icons | Out-Null
 
-foreach ($s in @(16, 32, 48, 128)) {
+foreach ($s in @(16, 32, 48, 128, 300)) {
   $bmp = New-Object System.Drawing.Bitmap($s, $s)
   $g = [System.Drawing.Graphics]::FromImage($bmp)
   $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
