@@ -208,20 +208,21 @@ export const claude: PlatformAdapter = {
   },
 
   detectActiveModel(): string | null {
-    // Best-effort: the model picker near the composer shows the active
-    // model's name. Scan interactive controls for a known model family —
-    // broader and more robust than matching any one attribute name, and
-    // immune to selector-flag quirks. Only known families match, so
-    // unrelated controls never win; on failure the user's plan setting
-    // governs the meter.
+    // Best-effort: the model picker near the composer shows the active model.
+    // Prefer the SHORTEST matching text: the picker label is
+    // compact, while banners and marketing copy mentioning model
+    // names are long.
+    let best: string | null = null
     const candidates = document.querySelectorAll<HTMLElement>(
       'button, [aria-haspopup="listbox"], [data-testid*="model"]',
     )
     for (const el of candidates) {
       const text = elementText(el).trim()
-      if (/\b(opus|sonnet|haiku|fable)\b/i.test(text)) return text
+      if (/\b(opus|sonnet|haiku|fable)\b/i.test(text)) {
+        if (best === null || text.length < best.length) best = text
+      }
     }
-    return null
+    return best
   },
 
   async waitForResponse(timeoutMs: number): Promise<string | null> {

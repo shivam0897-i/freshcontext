@@ -202,18 +202,21 @@ export const chatgpt: PlatformAdapter = {
   },
 
   detectActiveModel(): string | null {
-    // Best-effort: the model picker near the composer names the active
-    // model ("GPT-5.6 Thinking", "GPT Instant", …). The meter derives the
-    // MODE (Instant vs Reasoning) from this text; unknown text falls back
-    // to the plan's default mode.
+    // Best-effort: the model picker near the composer names the active model.
+    // Prefer the SHORTEST matching text: the picker label is
+    // compact, while banners and marketing copy mentioning model
+    // names are long.
+    let best: string | null = null
     const candidates = document.querySelectorAll<HTMLElement>(
       'button, [aria-haspopup="listbox"], [data-testid*="model"]',
     )
     for (const el of candidates) {
       const text = elementText(el).trim()
-      if (/\b(gpt|thinking|instant|reasoning|extended)\b/i.test(text)) return text
+      if (/\b(gpt|thinking|instant|reasoning|extended)\b/i.test(text)) {
+        if (best === null || text.length < best.length) best = text
+      }
     }
-    return null
+    return best
   },
 
   async waitForResponse(timeoutMs: number): Promise<string | null> {

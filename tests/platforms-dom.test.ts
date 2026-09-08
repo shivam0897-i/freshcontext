@@ -128,6 +128,16 @@ describe('claude adapter (DOM contract)', () => {
     load(CLAUDE_DOM)
     expect(claude.detectActiveModel!()).toBeNull()
   })
+
+  it('prefers the compact picker label over long banners naming the model', () => {
+    load(CLAUDE_DOM)
+    const banner = document.createElement('button')
+    banner.textContent = 'Now introducing Claude Sonnet 5 with great new features for everyone'
+    const picker = document.createElement('button')
+    picker.textContent = 'Claude Sonnet 5'
+    document.body.append(banner, picker)
+    expect(claude.detectActiveModel!()).toBe('Claude Sonnet 5')
+  })
 })
 
 describe('gemini adapter (DOM contract)', () => {

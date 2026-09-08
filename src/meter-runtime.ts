@@ -37,6 +37,7 @@ export function startMeter(
   let readTimer: ReturnType<typeof setTimeout> | null = null
   let lastWindowSize = settings.windows[adapter.id]
   let lastWindowLabel: string | undefined
+  let lastDetectedModel: string | null = null
 
   const engine = createMeterEngine({
     platform: adapter.id,
@@ -87,8 +88,23 @@ export function startMeter(
    * switch mid-conversation changes the divisor, and the engine recomputes
    * the display from its retained readings — no re-read of the page needed.
    */
+  /**
+   * The active model's text, with hysteresis: a single missed scan (picker
+   * re-rendering, dropdown open, DOM churn) must not flip the divisor to
+   * the plan fallback and back — the last known model holds until a new one
+   * is actually read.
+   */
+  function currentModelText(): string | null {
+    const detected = adapter.detectActiveModel?.() ?? null
+    if (detected) {
+      lastDetectedModel = detected
+      return detected
+    }
+    return lastDetectedModel
+  }
+
   function applyWindow(): void {
-    const modelText = adapter.detectActiveModel?.() ?? null
+    const modelText = currentModelText()
     const resolved = resolveWindow(adapter.id, settings.plans[adapter.id], modelText)
     const plan = planById(adapter.id, settings.plans[adapter.id])
     const size = resolved?.window ?? settings.windows[adapter.id]
@@ -118,7 +134,11 @@ export function startMeter(
   return {
     updateSettings(next: Settings) {
       settings = next
-      engine.dispatch({ type: 'settings', settings: meterSettingsFor(adapter.id, next) })
+      // Only thresholds here — applyWindow() is the single dispatcher of
+      // window changes. Dispatching the raw stored fallback first caused a
+      // visible flip (e.g. 500K -> 200K divisor) whenever settings changed,
+      // because detection had not necessarily re-run yet.
+      engine.dispatch({ type: 'settings', settings: { thresholds: next.thresholds } })
       applyWindow()
     },
     getDisplayed: () => engine.getDisplayed(),
