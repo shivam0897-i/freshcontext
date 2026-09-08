@@ -8,3 +8,4 @@ docs/superpowers/
 *.log
 promo/Screenshot*.png
 promo/screenshot-*.png
+/image.png

@@ -103,6 +103,10 @@ Selector-level behavior is implemented from documented, code-verified techniques
 
 If a site changed its DOM and something breaks, the badge shows an error state instead of silently misbehaving — file the selector in an issue; adapters are the only place selectors live.
 
+## A note on Chrome's "not trusted" warning
+
+If you use Chrome's **Enhanced Safe Browsing** mode, Chrome shows a "Proceed with caution — this extension is not trusted" dialog when installing FreshContext. This is standard for any new extension from a new developer and disappears as an extension accumulates installs and history; there is nothing specific to FreshContext in it. Users on Chrome's default protection settings do not see it. The extension is also fully open source — you can read every line before installing.
+
 ## Behavior notes & troubleshooting
 
 How the extension handles the situations you'll actually run into:
