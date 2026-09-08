@@ -20,6 +20,7 @@ const SEND_BUTTON =
   'button[aria-label*="Send" i], button.send-button, button[mattooltip*="Send"]'
 const STOP_BUTTON = 'button[aria-label*="Stop" i], button[mattooltip*="Stop"]'
 const HISTORY_CONTAINERS = [
+  '.conversation-container', // the current virtualization container (researched)
   '.chat-history-scroll-container',
   '#chat-history',
   '.chat-history',
@@ -60,17 +61,20 @@ function readViaDom(): ChatMessage[] {
 
 /**
  * Gemini virtualizes long chats — only rendered messages exist in the DOM.
- * Scroll upward until the message count stabilizes (gemini-chat-exporter's
- * pattern: up to 40 attempts, stop after the count stops growing).
+ * Load the full history by scrolling upward until the message count is
+ * stable across THREE consecutive checks (the researched exporter's
+ * pattern — one stable check stops early, since Gemini's lazy loads can
+ * gap longer than a single poll), then hand the caller the fully-loaded
+ * DOM to read BEFORE the scroll position is restored: restoring first
+ * starts Gemini's eviction, and reading mid-eviction captures a random
+ * depth — the source of scroll-driven baseline fluctuation.
  *
  * Respect for the viewport: if the user is deliberately reading history
- * (scrolled away from the bottom), the read is skipped this round —
- * hijacking their scroll position to load messages is worse than a
- * momentarily stale baseline, and the next read completes once they're
- * back at the bottom. When the load does run, it ends by restoring the
- * bottom, where chat users almost always are.
+ * (scrolled away from the bottom), the load is skipped this round —
+ * hijacking their position is worse than a momentarily stale baseline,
+ * and the next read completes once they're back at the bottom.
  */
-async function scrollToLoadAll(): Promise<void> {
+async function loadFullHistory(): Promise<void> {
   const container = HISTORY_CONTAINERS.map((s) => document.querySelector(s)).find(Boolean) as
     | HTMLElement
     | undefined
@@ -79,14 +83,18 @@ async function scrollToLoadAll(): Promise<void> {
     container.scrollHeight - container.scrollTop - container.clientHeight
   if (distanceFromBottom > 120) return // user is reading history — don't touch the scroll
   let previousCount = -1
-  for (let i = 0; i < 40; i++) {
+  let stableChecks = 0
+  for (let i = 0; i < 40 && stableChecks < 3; i++) {
     const count = document.querySelectorAll('user-query, model-response').length
-    if (count === previousCount) break
-    previousCount = count
-    container.scrollTop = 0
-    await sleep(250)
+    if (count === previousCount) {
+      stableChecks++
+    } else {
+      stableChecks = 0
+      previousCount = count
+      container.scrollTop = 0
+    }
+    await sleep(400)
   }
-  container.scrollTop = container.scrollHeight
 }
 
 function lastAssistantText(): string | null {
@@ -140,8 +148,16 @@ export const gemini: PlatformAdapter = {
   },
 
   async readConversation(): Promise<ChatMessage[]> {
-    await scrollToLoadAll()
-    return readViaDom()
+    // Load the full history, read the DOM while it is fully loaded, and
+    // only then restore the scroll — reading after the restore races
+    // Gemini's eviction of older messages and captures a random depth.
+    const container = HISTORY_CONTAINERS.map((s) => document.querySelector(s)).find(Boolean) as
+      | HTMLElement
+      | undefined
+    await loadFullHistory()
+    const messages = readViaDom()
+    if (container) container.scrollTop = container.scrollHeight
+    return messages
   },
 
   readConversationFast(): ChatMessage[] {
