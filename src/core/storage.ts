@@ -122,3 +122,27 @@ export async function listBriefs(): Promise<SavedBrief[]> {
   const raw = await chrome.storage.local.get('briefs')
   return (raw?.['briefs'] ?? []) as SavedBrief[]
 }
+
+/**
+ * What the meter is currently dividing by on the most recent active chat
+ * tab — surfaced to the side panel so the live state is visible where the
+ * user configures, not only on the badge.
+ */
+export interface LiveModel {
+  platform: PlatformId
+  /** The detected model text/slug, or null when the plan governs. */
+  model: string | null
+  window: number
+  /** Provenance ("1M · DETECTED", "PLUS · REASONING · ASSUMED"). */
+  label: string | null
+  updatedAt: number
+}
+
+export async function saveLiveModel(live: LiveModel): Promise<void> {
+  await chrome.storage.local.set({ liveModel: live })
+}
+
+export async function getLiveModel(): Promise<LiveModel | null> {
+  const raw = await chrome.storage.local.get('liveModel')
+  return (raw?.['liveModel'] as LiveModel | undefined) ?? null
+}

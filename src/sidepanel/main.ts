@@ -11,7 +11,7 @@ import {
   presetForThresholds,
   type PlanPreset,
 } from '../core/presets'
-import { getSettings, listBriefs, setSettings, type SavedBrief, type Settings } from '../core/storage'
+import { getSettings, getLiveModel, listBriefs, setSettings, type LiveModel, type SavedBrief, type Settings } from '../core/storage'
 
 const $ = <T extends HTMLElement>(id: string): T => {
   const el = document.getElementById(id)
@@ -23,6 +23,7 @@ const input = (id: string): HTMLInputElement => $<HTMLInputElement>(id)
 const textarea = (id: string): HTMLTextAreaElement => $<HTMLTextAreaElement>(id)
 
 let settings: Settings
+let liveModel: LiveModel | null = null
 let savedTimer: ReturnType<typeof setTimeout> | null = null
 
 /** Auto-save is the whole point — there is no Save button to forget. */
@@ -73,11 +74,23 @@ function renderPlatforms(): void {
     info.className = 'grow'
     const name = document.createElement('div')
     name.className = 'name'
-    name.textContent = plans[0]?.label ? platformLabel(platform) : platform
+    name.textContent = platformLabel(platform)
     const hint = document.createElement('div')
     hint.className = 'hint'
     const active = settings.enabledPlatforms[platform] !== false
-    hint.textContent = active ? planForWindow(platform, settings.windows[platform])?.source === 'official' ? 'Official window sizes' : 'Community-measured sizes' : 'Off — reload tabs to apply'
+    // Live status: when this platform is the one currently being metered,
+    // show what's actually detected — the model and the window it resolves
+    // to — instead of only the static plan description.
+    if (liveModel && liveModel.platform === platform) {
+      const modelPart = liveModel.model ? `${liveModel.model} · ` : ''
+      hint.textContent = `Live: ${modelPart}÷${formatWindow(liveModel.window)}${liveModel.label ? ` · ${liveModel.label}` : ''}`
+    } else if (active) {
+      hint.textContent = planForWindow(platform, settings.windows[platform])?.source === 'official'
+        ? 'Official window sizes'
+        : 'Community-measured sizes'
+    } else {
+      hint.textContent = 'Off — reload tabs to apply'
+    }
     info.append(name, hint)
 
     const toggle = document.createElement('button')
@@ -272,6 +285,16 @@ function renderBrief(container: HTMLElement, brief: SavedBrief): void {
 
 async function main(): Promise<void> {
   settings = await getSettings()
+  liveModel = await getLiveModel()
+
+  // The live model updates as the user switches chats/models — re-render
+  // the platform rows so the status stays current while the panel is open.
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === 'local' && changes['liveModel']) {
+      liveModel = (changes['liveModel'].newValue as LiveModel | undefined) ?? null
+      renderPlatforms()
+    }
+  })
 
   bindSwitch('badgeVisible', (s) => s.badgeVisible, (on) => ({ badgeVisible: on }))
   bindSwitch('autoSend', (s) => s.autoSend, (on) => ({ autoSend: on }))

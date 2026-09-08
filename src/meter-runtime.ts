@@ -4,6 +4,7 @@ import { createMeterEngine } from './core/meter-engine'
 import { countTokensViaBackground } from './core/rpc'
 import { planById, resolveWindow } from './core/presets'
 import type { Settings } from './core/storage'
+import { saveLiveModel, type LiveModel } from './core/storage'
 import type { MeterState } from './core/meter'
 import type { PlatformAdapter } from './platforms/types'
 import type { BadgeController } from './ui/badge'
@@ -43,6 +44,7 @@ export function startMeter(
   let lastDetectedModel: string | null = null
   let lastUrl: string | null = null
   let tickCount = 0
+  let lastWrittenLive: LiveModel | null = null
 
   const engine = createMeterEngine({
     platform: adapter.id,
@@ -127,6 +129,13 @@ export function startMeter(
     const label =
       resolved?.label ?? (resolved && plan ? `${plan.label.toUpperCase()} · SETTING` : undefined)
     engine.dispatch({ type: 'settings', settings: { windowSize: window, windowLabel: label } })
+
+    // Surface the live state to the side panel — written only on change so
+    // the storage doesn't churn every tick.
+    if (window !== lastWrittenLive?.window || label !== lastWrittenLive?.label || modelText !== lastWrittenLive?.model) {
+      lastWrittenLive = { platform: adapter.id, model: modelText, window, label: label ?? null, updatedAt: Date.now() }
+      void saveLiveModel(lastWrittenLive)
+    }
   }
 
   function tick(): void {
