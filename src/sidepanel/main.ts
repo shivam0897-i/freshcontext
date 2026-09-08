@@ -112,12 +112,18 @@ function renderPlatforms(): void {
     row.append(info, toggle)
     container.appendChild(row)
 
-    // Plan selector row
+    // Plan selector row. On ChatGPT and Gemini the plan determines the
+    // window; on Claude the MODEL does, so the picker there is the fallback
+    // for when detection fails — labeled honestly.
     const planRow = document.createElement('div')
     planRow.className = 'row'
     const planLabel = document.createElement('div')
     planLabel.className = 'grow'
-    planLabel.innerHTML = '<div class="name" style="font-size:11.5px;color:var(--muted)">Your plan</div>'
+    const planLabelText =
+      platform === 'claude'
+        ? 'Window size <span style="color:var(--faint)">(model-driven — this is the fallback)</span>'
+        : 'Your plan'
+    planLabel.innerHTML = `<div class="name" style="font-size:11.5px;color:var(--muted)">${planLabelText}</div>`
 
     const select = document.createElement('select')
     for (const plan of plans) {
