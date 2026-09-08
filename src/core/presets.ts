@@ -194,9 +194,12 @@ export interface ModelWindowRule {
 
 const MODEL_WINDOWS: Partial<Record<PlatformId, ModelWindowRule[]>> = {
   claude: [
-    { pattern: /\b(fable|opus\s*5|sonnet\s*5)\b/i, window: 1_000_000, label: '1M' },
-    { pattern: /\b(opus\s*4\.[6-9]|sonnet\s*4\.6)\b/i, window: 500_000, label: '500K' },
-    { pattern: /\b(haiku|opus\s*4\.[0-5]|sonnet\s*4\.[0-5])\b/i, window: 200_000, label: '200K' },
+    // Separator-agnostic: display text says "Claude Sonnet 4.5", the API slug
+    // says "claude-sonnet-4-5" — both must resolve, while "Sonnet 45" (no
+    // separator between version parts) must not.
+    { pattern: /\b(fable|opus[\s.-]*5|sonnet[\s.-]*5)\b/i, window: 1_000_000, label: '1M' },
+    { pattern: /\b(opus[\s.-]*4[\s.-]+[6-9]|sonnet[\s.-]*4[\s.-]+6)\b/i, window: 500_000, label: '500K' },
+    { pattern: /\b(haiku|opus[\s.-]*4[\s.-]+[0-5]|sonnet[\s.-]*4[\s.-]+[0-5])\b/i, window: 200_000, label: '200K' },
   ],
 }
 

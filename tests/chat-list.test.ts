@@ -127,6 +127,23 @@ describe('claude history capabilities', () => {
     expect(chats[2]?.title).toBe('Untitled chat') // final fallback
   })
 
+  it('captures the conversation model for API-first detection', async () => {
+    stubFetch([
+      {
+        pattern: '/api/organizations/org-1/chat_conversations/uuid-9',
+        body: {
+          model: 'claude-sonnet-5',
+          chat_messages: [
+            { sender: 'human', content: [{ type: 'text', text: 'hi' }] },
+          ],
+        },
+      },
+    ])
+    document.cookie = 'lastActiveOrg=org-1'
+    await claude.readConversationById!('uuid-9')
+    expect(claude.detectActiveModel!()).toBe('claude-sonnet-5')
+  })
+
   it('reads a conversation by uuid, mapping senders to roles', async () => {
     stubFetch([
       {

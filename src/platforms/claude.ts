@@ -77,6 +77,15 @@ function lastAssistantText(): string | null {
   return null
 }
 
+/**
+ * The active model as reported by the conversation API — set on every full
+ * read, refreshed on every conversation change. Preferred over the DOM scan
+ * because it is authoritative: the response's `model` field (e.g.
+ * "claude-sonnet-5") is what the app itself uses, with no picker-rendering,
+ * dropdown, or banner ambiguity.
+ */
+let lastApiModel: string | null = null
+
 /** Same-session internal-API access — the pattern claude-chat-exporter ships with. */
 async function fetchConversationById(id: string): Promise<ChatMessage[] | null> {
   try {
@@ -88,8 +97,10 @@ async function fetchConversationById(id: string): Promise<ChatMessage[] | null> 
     )
     if (!res.ok) return null
     const data = (await res.json()) as {
+      model?: string
       chat_messages?: { sender?: string; content?: { type?: string; text?: string }[] }[]
     }
+    if (typeof data.model === 'string' && data.model) lastApiModel = data.model
     const out: ChatMessage[] = []
     for (const msg of data.chat_messages ?? []) {
       const role = msg.sender === 'human' ? 'user' : msg.sender === 'assistant' ? 'assistant' : null
@@ -209,9 +220,10 @@ export const claude: PlatformAdapter = {
   },
 
   detectActiveModel(): string | null {
-    // Shared scan: shortest model-family match among interactive controls,
-    // suppressed while a dropdown is open (see scanModelText).
-    return scanModelText(CLAUDE_MODEL_PATTERN)
+    // API-first: the conversation response's `model` field is authoritative
+    // (captured on every full read). The DOM scan is only the fallback for
+    // the window before the first read completes.
+    return lastApiModel ?? scanModelText(CLAUDE_MODEL_PATTERN)
   },
 
   async waitForResponse(timeoutMs: number): Promise<string | null> {

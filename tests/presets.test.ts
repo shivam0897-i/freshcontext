@@ -88,6 +88,13 @@ describe('plan presets', () => {
 })
 
 describe('model window resolution (Claude, model-driven)', () => {
+  it('maps API model slugs (hyphenated) exactly like display text', () => {
+    expect(windowForModel('claude', 'claude-sonnet-5')).toEqual({ window: 1_000_000, label: '1M' })
+    expect(windowForModel('claude', 'claude-opus-4-6')).toEqual({ window: 500_000, label: '500K' })
+    expect(windowForModel('claude', 'claude-haiku-4-5')).toEqual({ window: 200_000, label: '200K' })
+    expect(windowForModel('claude', 'claude-fable-5-1')).toEqual({ window: 1_000_000, label: '1M' })
+  })
+
   it('maps Claude model text to web-app windows', () => {
     expect(windowForModel('claude', 'Claude Sonnet 5')).toEqual({ window: 1_000_000, label: '1M' })
     expect(windowForModel('claude', 'Claude Opus 5')).toEqual({ window: 1_000_000, label: '1M' })
