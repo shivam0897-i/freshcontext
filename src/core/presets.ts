@@ -47,7 +47,11 @@ export interface PlanPreset {
   label: string
   /** How the size is known — shown so users can judge trustworthiness. */
   source: string
-  window: number
+  /** Window when an Instant model is active. Equals reasoningWindow on
+   *  platforms where the plan alone determines the window. */
+  instantWindow: number
+  /** Window when a Reasoning model is active. */
+  reasoningWindow: number
 }
 
 /**
@@ -57,27 +61,24 @@ export interface PlanPreset {
 export const PLAN_PRESETS: Record<PlatformId, PlanPreset[]> = {
   // ChatGPT's web-app windows, now published on OpenAI's own pricing page
   // (chatgpt.com/pricing — "GPT Instant / GPT Reasoning total context
-  // window" per plan) and split by model MODE within paid plans. Free's
-  // reasoning window is officially "Varies", so Free users meter against
-  // the Instant window. Business tracks Plus. Cross-checked 2026-09-08.
+  // window" per plan), split by model MODE within paid plans. Free's
+  // reasoning window is officially "Varies", so Free meters against 27K in
+  // both modes. Business tracks Plus. Cross-checked 2026-09-08.
   chatgpt: [
-    { id: 'free', label: 'Free', source: 'official', window: 27_000 },
-    { id: 'go-instant', label: 'Go — Instant models', source: 'official', window: 54_000 },
-    { id: 'go-reasoning', label: 'Go — Reasoning models', source: 'official', window: 256_000 },
-    { id: 'plus-instant', label: 'Plus — Instant models', source: 'official', window: 54_000 },
-    { id: 'plus-reasoning', label: 'Plus — Reasoning models', source: 'official', window: 256_000 },
-    { id: 'pro-instant', label: 'Pro — Instant models', source: 'official', window: 128_000 },
-    { id: 'pro-reasoning', label: 'Pro — Reasoning models', source: 'official', window: 400_000 },
+    { id: 'free', label: 'Free', source: 'official', instantWindow: 27_000, reasoningWindow: 27_000 },
+    { id: 'go', label: 'Go', source: 'official', instantWindow: 54_000, reasoningWindow: 256_000 },
+    { id: 'plus', label: 'Plus', source: 'official', instantWindow: 54_000, reasoningWindow: 256_000 },
+    { id: 'pro', label: 'Pro', source: 'official', instantWindow: 128_000, reasoningWindow: 400_000 },
   ],
   claude: [
-    { id: 'default', label: 'Default models', source: 'official', window: 200_000 },
-    { id: 'newer', label: 'Opus 4.6+ / Sonnet 4.6', source: 'official', window: 500_000 },
-    { id: 'latest', label: 'Sonnet 5 / Opus 5 / Fable 5.1', source: 'official', window: 1_000_000 },
+    { id: 'default', label: 'Default models', source: 'official', instantWindow: 200_000, reasoningWindow: 200_000 },
+    { id: 'newer', label: 'Opus 4.6+ / Sonnet 4.6', source: 'official', instantWindow: 500_000, reasoningWindow: 500_000 },
+    { id: 'latest', label: 'Sonnet 5 / Opus 5 / Fable 5.1', source: 'official', instantWindow: 1_000_000, reasoningWindow: 1_000_000 },
   ],
   gemini: [
-    { id: 'free', label: 'Free', source: 'official', window: 32_000 },
-    { id: 'aiplus', label: 'AI Plus', source: 'official', window: 128_000 },
-    { id: 'aipro', label: 'AI Pro / Ultra', source: 'official', window: 1_000_000 },
+    { id: 'free', label: 'Free', source: 'official', instantWindow: 32_000, reasoningWindow: 32_000 },
+    { id: 'aiplus', label: 'AI Plus', source: 'official', instantWindow: 128_000, reasoningWindow: 128_000 },
+    { id: 'aipro', label: 'AI Pro / Ultra', source: 'official', instantWindow: 1_000_000, reasoningWindow: 1_000_000 },
   ],
 }
 
@@ -87,7 +88,70 @@ export const PLAN_SOURCES: Record<string, string> = {
 }
 
 export function planForWindow(platform: PlatformId, window: number): PlanPreset | null {
-  return PLAN_PRESETS[platform].find((p) => p.window === window) ?? null
+  return (
+    PLAN_PRESETS[platform].find(
+      (p) => p.instantWindow === window || p.reasoningWindow === window,
+    ) ?? null
+  )
+}
+
+export function planById(platform: PlatformId, id: string | undefined): PlanPreset | null {
+  if (!id) return null
+  return PLAN_PRESETS[platform].find((p) => p.id === id) ?? null
+}
+
+/** The mode a plan's models default to when the active model can't be read. */
+export function fallbackModeForPlan(plan: PlanPreset): 'instant' | 'reasoning' {
+  return plan.id === 'free' ? 'instant' : 'reasoning'
+}
+
+/** Classify the model mode from ChatGPT's model-picker text, if it says. */
+export function chatgptModeForText(text: string): 'instant' | 'reasoning' | null {
+  if (/\binstant\b/i.test(text)) return 'instant'
+  if (/\b(thinking|reasoning|extended)\b/i.test(text)) return 'reasoning'
+  return null
+}
+
+/**
+ * Resolve the effective context window. Detection-first: the page's active
+ * model (Claude) or model mode (ChatGPT) wins when readable; the user's plan
+ * selection is the fallback, never the whole story. The label carries the
+ * provenance ("1M · DETECTED", "PLUS · REASONING · DETECTED"); null means
+ * the caller should derive it from the plan ("PLUS · SETTING").
+ */
+export interface WindowResolution {
+  window: number
+  label: string | null
+}
+
+export function resolveWindow(
+  platform: PlatformId,
+  planId: string | undefined,
+  modelText: string | null,
+): WindowResolution | null {
+  if (platform === 'claude') {
+    if (modelText) {
+      const byModel = windowForModel(platform, modelText)
+      if (byModel) return { window: byModel.window, label: `${byModel.label} · DETECTED` }
+    }
+    const plan = planById(platform, planId)
+    if (plan) return { window: plan.instantWindow, label: null }
+    return null
+  }
+  if (platform === 'chatgpt') {
+    const plan = planById(platform, planId)
+    if (!plan) return null
+    const detectedMode = modelText ? chatgptModeForText(modelText) : null
+    const mode = detectedMode ?? fallbackModeForPlan(plan)
+    const window = mode === 'instant' ? plan.instantWindow : plan.reasoningWindow
+    if (detectedMode) {
+      return { window, label: `${plan.label.toUpperCase()} · ${detectedMode.toUpperCase()} · DETECTED` }
+    }
+    return { window, label: null }
+  }
+  const plan = planById(platform, planId)
+  if (plan) return { window: plan.instantWindow, label: null }
+  return null
 }
 
 /**

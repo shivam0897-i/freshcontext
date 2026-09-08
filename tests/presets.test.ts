@@ -2,8 +2,12 @@ import { describe, expect, it } from 'vitest'
 import {
   PLAN_PRESETS,
   WARNING_PRESETS,
+  chatgptModeForText,
+  fallbackModeForPlan,
+  planById,
   planForWindow,
   presetForThresholds,
+  resolveWindow,
   windowForModel,
 } from '../src/core/presets'
 import { DEFAULT_THRESHOLDS, DEFAULT_WINDOWS } from '../src/core/constants'
@@ -39,12 +43,14 @@ describe('plan presets', () => {
   })
 
   it('every plan window maps back to a plan with that window', () => {
-    // Free and Go legitimately share a window, so the reverse mapping may
-    // resolve to either — what matters is it never resolves to a different
-    // window size.
     for (const [platform, plans] of Object.entries(PLAN_PRESETS)) {
       for (const plan of plans) {
-        expect(planForWindow(platform as 'chatgpt', plan.window)?.window).toBe(plan.window)
+        expect(planForWindow(platform as 'chatgpt', plan.instantWindow)?.instantWindow).toBe(
+          plan.instantWindow,
+        )
+        expect(planForWindow(platform as 'chatgpt', plan.reasoningWindow)?.reasoningWindow).toBe(
+          plan.reasoningWindow,
+        )
       }
     }
   })
@@ -53,24 +59,26 @@ describe('plan presets', () => {
     expect(planForWindow('chatgpt', 64_000)).toBeNull()
   })
 
-  it('plan ids are unique per platform so saved values map back unambiguously', () => {
+  it('plan ids are unique per platform', () => {
     for (const plans of Object.values(PLAN_PRESETS)) {
       const ids = plans.map((p) => p.id)
       expect(new Set(ids).size).toBe(ids.length)
     }
   })
 
-  it('splits paid plans by model mode, with Go matching Plus context (official)', () => {
+  it('keeps plans distinct: one entry per plan, modes carried as dual windows', () => {
+    const chatgptIds = PLAN_PRESETS.chatgpt.map((p) => p.id)
+    expect(chatgptIds).toEqual(['free', 'go', 'plus', 'pro'])
     const byId = Object.fromEntries(PLAN_PRESETS.chatgpt.map((p) => [p.id, p]))
-    expect(byId['go-instant']?.window).toBe(byId['plus-instant']?.window)
-    expect(byId['go-reasoning']?.window).toBe(byId['plus-reasoning']?.window)
-    expect(byId.free?.window).toBeLessThan(byId['go-instant']?.window ?? 0)
-    expect(byId['plus-reasoning']?.window).toBeGreaterThan(byId['plus-instant']?.window ?? 0)
-    expect(byId['pro-reasoning']?.window).toBeGreaterThan(byId['pro-instant']?.window ?? 0)
+    // Go matches Plus context (official), Pro is strictly larger.
+    expect(byId.go?.instantWindow).toBe(byId.plus?.instantWindow)
+    expect(byId.go?.reasoningWindow).toBe(byId.plus?.reasoningWindow)
+    expect(byId.pro?.reasoningWindow).toBeGreaterThan(byId.plus?.reasoningWindow ?? 0)
+    expect(byId.free?.instantWindow).toBeLessThan(byId.go?.instantWindow ?? 0)
   })
 })
 
-describe('model window resolution', () => {
+describe('model window resolution (Claude, model-driven)', () => {
   it('maps Claude model text to web-app windows', () => {
     expect(windowForModel('claude', 'Claude Sonnet 5')).toEqual({ window: 1_000_000, label: '1M' })
     expect(windowForModel('claude', 'Claude Opus 5')).toEqual({ window: 1_000_000, label: '1M' })
@@ -93,5 +101,55 @@ describe('model window resolution', () => {
 
   it('does not confuse version substrings (word boundaries)', () => {
     expect(windowForModel('claude', 'Sonnet 45')).toBeNull()
+  })
+})
+
+describe('effective window resolution (detection-first)', () => {
+  it('claude: the detected model wins over the plan selection', () => {
+    expect(resolveWindow('claude', 'default', 'Claude Sonnet 5')).toEqual({
+      window: 1_000_000,
+      label: '1M · DETECTED',
+    })
+  })
+
+  it('claude: falls back to the selected plan when no model is readable', () => {
+    expect(resolveWindow('claude', 'newer', null)).toEqual({ window: 500_000, label: null })
+  })
+
+  it('chatgpt: plan × detected mode — Thinking text gives the reasoning window', () => {
+    expect(resolveWindow('chatgpt', 'plus', 'GPT-5.6 Thinking')).toEqual({
+      window: 256_000,
+      label: 'PLUS · REASONING · DETECTED',
+    })
+    expect(resolveWindow('chatgpt', 'plus', 'GPT Instant')).toEqual({
+      window: 54_000,
+      label: 'PLUS · INSTANT · DETECTED',
+    })
+  })
+
+  it('chatgpt: unreadable mode falls back to the plan default (Reasoning on paid)', () => {
+    expect(resolveWindow('chatgpt', 'plus', null)).toEqual({ window: 256_000, label: null })
+    expect(resolveWindow('chatgpt', 'free', null)).toEqual({ window: 27_000, label: null })
+    expect(fallbackModeForPlan(planById('chatgpt', 'free')!)).toBe('instant')
+    expect(fallbackModeForPlan(planById('chatgpt', 'pro')!)).toBe('reasoning')
+  })
+
+  it('chatgpt: model text that names no mode is ignored, not guessed', () => {
+    expect(resolveWindow('chatgpt', 'pro', 'GPT-5.6 Sol')).toEqual({ window: 400_000, label: null })
+  })
+
+  it('gemini: the plan alone determines the window', () => {
+    expect(resolveWindow('gemini', 'aiplus', null)).toEqual({ window: 128_000, label: null })
+  })
+
+  it('a custom plan id resolves to nothing — the stored window governs', () => {
+    expect(resolveWindow('chatgpt', 'custom', null)).toBeNull()
+  })
+
+  it('mode classification from picker text', () => {
+    expect(chatgptModeForText('GPT-5.6 Thinking')).toBe('reasoning')
+    expect(chatgptModeForText('GPT Instant')).toBe('instant')
+    expect(chatgptModeForText('Extended thinking')).toBe('reasoning')
+    expect(chatgptModeForText('GPT-5.6 Sol')).toBeNull()
   })
 })

@@ -4,8 +4,11 @@ import type { PlatformId } from '../core/constants'
 import {
   PLAN_PRESETS,
   WARNING_PRESETS,
+  fallbackModeForPlan,
+  planById,
   planForWindow,
   presetForThresholds,
+  type PlanPreset,
 } from '../core/presets'
 import { getSettings, listBriefs, setSettings, type SavedBrief, type Settings } from '../core/storage'
 
@@ -103,18 +106,18 @@ function renderPlatforms(): void {
     planLabel.innerHTML = '<div class="name" style="font-size:11.5px;color:var(--muted)">Your plan</div>'
 
     const select = document.createElement('select')
-    const matched = planForWindow(platform, settings.windows[platform])
     for (const plan of plans) {
       const opt = document.createElement('option')
       opt.value = plan.id
-      opt.textContent = `${plan.label} — ${(plan.window / 1000).toLocaleString()}K`
+      opt.textContent = planOptionLabel(plan)
       select.appendChild(opt)
     }
     const customOpt = document.createElement('option')
     customOpt.value = 'custom'
     customOpt.textContent = 'Custom size'
     select.appendChild(customOpt)
-    select.value = matched?.id ?? 'custom'
+    const selectedPlan = planById(platform, settings.plans[platform])
+    select.value = selectedPlan?.id ?? 'custom'
 
     const customWrap = document.createElement('span')
     customWrap.style.display = select.value === 'custom' ? '' : 'none'
@@ -129,10 +132,17 @@ function renderPlatforms(): void {
       const chosen = plans.find((p) => p.id === select.value)
       customWrap.style.display = chosen ? 'none' : ''
       if (chosen) {
-        settings.windows[platform] = chosen.window
-        custom.value = String(chosen.window)
-        void save({ windows: { ...settings.windows } })
+        // The plan id is the source of truth; the stored window is the
+        // fallback used when the active model can't be detected — the
+        // plan's default mode (Reasoning on paid ChatGPT tiers).
+        const mode = fallbackModeForPlan(chosen)
+        settings.plans[platform] = chosen.id
+        settings.windows[platform] = mode === 'instant' ? chosen.instantWindow : chosen.reasoningWindow
+        custom.value = String(settings.windows[platform])
+        void save({ plans: { ...settings.plans }, windows: { ...settings.windows } })
       } else {
+        settings.plans[platform] = 'custom'
+        void save({ plans: { ...settings.plans } })
         custom.focus()
       }
     })
@@ -140,7 +150,9 @@ function renderPlatforms(): void {
     custom.addEventListener('change', () => {
       const value = Math.max(1000, Number(custom.value) || DEFAULT_WINDOWS[platform])
       settings.windows[platform] = value
-      void save({ windows: { ...settings.windows } })
+      settings.plans[platform] = 'custom'
+      select.value = 'custom'
+      void save({ windows: { ...settings.windows }, plans: { ...settings.plans } })
     })
 
     planRow.append(planLabel, select, customWrap)
@@ -148,6 +160,14 @@ function renderPlatforms(): void {
 
     platformRefs.set(platform, { select, customWrap, custom })
   }
+}
+
+function planOptionLabel(plan: PlanPreset): string {
+  const fmt = (w: number) => `${(w / 1000).toLocaleString()}K`
+  if (plan.instantWindow === plan.reasoningWindow) {
+    return `${plan.label} — ${fmt(plan.instantWindow)}`
+  }
+  return `${plan.label} — ${fmt(plan.instantWindow)} / ${fmt(plan.reasoningWindow)}`
 }
 
 function platformLabel(platform: PlatformId): string {

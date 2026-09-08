@@ -44,6 +44,17 @@ describe('settings', () => {
     expect(s.autoSend).toBe(false)
     expect(s.badgeVisible).toBe(true)
     expect(s.enabledPlatforms).toEqual({ chatgpt: true, claude: true, gemini: true })
+    expect(s.plans).toEqual({ chatgpt: 'free', claude: 'default', gemini: 'free' })
+  })
+
+  it('migrates pre-plan installs: a custom stored window becomes the custom plan', async () => {
+    await chrome.storage.local.set({
+      settings: { windows: { chatgpt: 64_000, claude: 200_000, gemini: 32_000 } },
+    })
+    const s = await getSettings()
+    expect(s.plans.chatgpt).toBe('custom')
+    expect(s.windows.chatgpt).toBe(64_000)
+    expect(s.plans.claude).toBe('default') // matches the plan default — not custom
   })
 
   it('merges partial patches with defaults', async () => {

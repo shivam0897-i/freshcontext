@@ -201,6 +201,21 @@ export const chatgpt: PlatformAdapter = {
     return conversationId()
   },
 
+  detectActiveModel(): string | null {
+    // Best-effort: the model picker near the composer names the active
+    // model ("GPT-5.6 Thinking", "GPT Instant", …). The meter derives the
+    // MODE (Instant vs Reasoning) from this text; unknown text falls back
+    // to the plan's default mode.
+    const candidates = document.querySelectorAll<HTMLElement>(
+      'button, [aria-haspopup="listbox"], [data-testid*="model"]',
+    )
+    for (const el of candidates) {
+      const text = elementText(el).trim()
+      if (/\b(gpt|thinking|instant|reasoning|extended)\b/i.test(text)) return text
+    }
+    return null
+  },
+
   async waitForResponse(timeoutMs: number): Promise<string | null> {
     return waitForNewAssistantMessage({
       previousLastText: lastAssistantText() ?? '',

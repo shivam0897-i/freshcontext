@@ -30,6 +30,17 @@ function formatWindow(window: number): string {
   return `${Math.round(window / 1000)}K`
 }
 
+/**
+ * Percentages with a decimal below 5%: at 1M-token windows a normal chat
+ * sits under 1% for a long time, and a bare "0%" reads as broken. One
+ * decimal keeps it honest AND informative.
+ */
+function formatPct(pct: number): string {
+  const value = pct * 100
+  if (value > 0 && value < 5) return value.toFixed(1)
+  return String(Math.round(value))
+}
+
 const LEVEL_COLOR: Record<string, string> = {
   ok: TOKENS.green,
   amber: TOKENS.amber,
@@ -313,8 +324,8 @@ export function mountBadge(options: BadgeOptions): BadgeController {
     lbl.textContent = 'full'
     const color = LEVEL_COLOR[current.level] ?? TOKENS.green
     fill.style.background = color
-    fill.style.width = `${Math.round(current.pct * 100)}%`
-    pct.textContent = `${Math.round(current.pct * 100)}%`
+    fill.style.width = `${Math.max(current.pct * 100, current.pct > 0 ? 2 : 0)}%`
+    pct.textContent = `${formatPct(current.pct)}%`
     pct.style.color = color
 
     dot.style.background = color
@@ -326,8 +337,7 @@ export function mountBadge(options: BadgeOptions): BadgeController {
       return
     }
 
-    const pctLabel = Math.round(current.pct * 100)
-    titleText.textContent = `Chat is ${pctLabel}% full`
+    titleText.textContent = `Chat is ${formatPct(current.pct)}% full`
     const left = messagesLeftEstimate(current)
     desc.textContent =
       current.level === 'red'

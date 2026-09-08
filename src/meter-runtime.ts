@@ -2,7 +2,7 @@ import type { PlatformId } from './core/constants'
 import type { MeterRequest, MeterSettings } from './core/meter-engine'
 import { createMeterEngine } from './core/meter-engine'
 import { countTokensViaBackground } from './core/rpc'
-import { windowForModel } from './core/presets'
+import { planById, resolveWindow } from './core/presets'
 import type { Settings } from './core/storage'
 import type { MeterState } from './core/meter'
 import type { PlatformAdapter } from './platforms/types'
@@ -89,9 +89,13 @@ export function startMeter(
    */
   function applyWindow(): void {
     const modelText = adapter.detectActiveModel?.() ?? null
-    const resolved = modelText ? windowForModel(adapter.id, modelText) : null
+    const resolved = resolveWindow(adapter.id, settings.plans[adapter.id], modelText)
+    const plan = planById(adapter.id, settings.plans[adapter.id])
     const size = resolved?.window ?? settings.windows[adapter.id]
-    const label = resolved ? `${resolved.label} DETECTED` : undefined
+    // Provenance: detected model/mode, else the plan setting, else a custom
+    // window number with no label (the badge shows the bare divisor).
+    const label =
+      resolved?.label ?? (resolved && plan ? `${plan.label.toUpperCase()} · SETTING` : undefined)
     if (size !== lastWindowSize || label !== lastWindowLabel) {
       lastWindowSize = size
       lastWindowLabel = label

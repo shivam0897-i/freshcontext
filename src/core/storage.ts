@@ -1,10 +1,15 @@
 import { DEFAULT_PROMPT } from './brief'
+import { planById } from './presets'
 import { DEFAULT_THRESHOLDS, DEFAULT_WINDOWS } from './constants'
 import type { PlatformId, Thresholds } from './constants'
 
 export interface Settings {
   thresholds: Thresholds
+  /** Effective fallback window per platform (used when detection can't read
+   *  the active model — the plan selection below is the source of truth). */
   windows: Record<PlatformId, number>
+  /** Selected plan id per platform (see core/presets PLAN_PRESETS). */
+  plans: Record<PlatformId, string>
   autoSend: boolean
   promptTemplate: string
   /** Master switch for the floating badge. */
@@ -30,6 +35,7 @@ export interface SavedBrief {
 const DEFAULT_SETTINGS: Settings = {
   thresholds: DEFAULT_THRESHOLDS,
   windows: { ...DEFAULT_WINDOWS },
+  plans: { chatgpt: 'free', claude: 'default', gemini: 'free' },
   autoSend: false,
   promptTemplate: DEFAULT_PROMPT,
   badgeVisible: true,
@@ -39,14 +45,26 @@ const DEFAULT_SETTINGS: Settings = {
 export async function getSettings(): Promise<Settings> {
   const raw = await chrome.storage.local.get('settings')
   const s = (raw?.['settings'] ?? {}) as Partial<Settings>
-  return {
+  const merged: Settings = {
     ...DEFAULT_SETTINGS,
     ...s,
     thresholds: { ...DEFAULT_SETTINGS.thresholds, ...(s.thresholds ?? {}) },
     windows: { ...DEFAULT_SETTINGS.windows, ...(s.windows ?? {}) },
+    plans: { ...DEFAULT_SETTINGS.plans, ...(s.plans ?? {}) },
     enabledPlatforms: { ...DEFAULT_SETTINGS.enabledPlatforms, ...(s.enabledPlatforms ?? {}) },
     promptTemplate: s.promptTemplate?.trim() ? s.promptTemplate : DEFAULT_PROMPT,
   }
+  // Migration: installs from before plan selection stored only a window
+  // number. A window that matches no plan default is the user's custom
+  // choice — keep it authoritative instead of silently re-plan-ing them.
+  if (!s.plans) {
+    for (const platform of Object.keys(merged.windows) as PlatformId[]) {
+      const plan = planById(platform, merged.plans[platform])
+      const fallback = plan ? plan.instantWindow : DEFAULT_WINDOWS[platform]
+      if (merged.windows[platform] !== fallback) merged.plans[platform] = 'custom'
+    }
+  }
+  return merged
 }
 
 export async function setSettings(patch: Partial<Settings>): Promise<void> {
