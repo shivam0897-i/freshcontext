@@ -1,6 +1,6 @@
 {
   "name": "freshcontext",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": true,
   "description": "Watch your AI chat's context. Warn before quality drops. Continue in a fresh chat \u2014 same AI or another \u2014 with a handoff brief written by the AI itself. Local-only, open source (MIT).",
   "license": "MIT",

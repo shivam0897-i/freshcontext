@@ -60,9 +60,11 @@ describe('plan presets', () => {
     }
   })
 
-  it('lists the Go plan with Free-class window and splits paid plans by model mode', () => {
+  it('splits paid plans by model mode, with Go matching Plus context (official)', () => {
     const byId = Object.fromEntries(PLAN_PRESETS.chatgpt.map((p) => [p.id, p]))
-    expect(byId.go?.window).toBe(byId.free?.window)
+    expect(byId['go-instant']?.window).toBe(byId['plus-instant']?.window)
+    expect(byId['go-reasoning']?.window).toBe(byId['plus-reasoning']?.window)
+    expect(byId.free?.window).toBeLessThan(byId['go-instant']?.window ?? 0)
     expect(byId['plus-reasoning']?.window).toBeGreaterThan(byId['plus-instant']?.window ?? 0)
     expect(byId['pro-reasoning']?.window).toBeGreaterThan(byId['pro-instant']?.window ?? 0)
   })

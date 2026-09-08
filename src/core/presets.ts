@@ -55,17 +55,19 @@ export interface PlanPreset {
  * publishes none for the web app); Claude and Gemini sizes are official.
  */
 export const PLAN_PRESETS: Record<PlatformId, PlanPreset[]> = {
-  // ChatGPT's web-app windows are community-measured (OpenAI publishes none)
-  // and split by model MODE within paid plans: Instant models get a smaller
-  // window than Reasoning models on the same subscription. Business tracks
-  // Plus. These drift across model eras; users can enter a custom size.
+  // ChatGPT's web-app windows, now published on OpenAI's own pricing page
+  // (chatgpt.com/pricing — "GPT Instant / GPT Reasoning total context
+  // window" per plan) and split by model MODE within paid plans. Free's
+  // reasoning window is officially "Varies", so Free users meter against
+  // the Instant window. Business tracks Plus. Cross-checked 2026-09-08.
   chatgpt: [
-    { id: 'free', label: 'Free', source: 'community-measured', window: 27_000 },
-    { id: 'go', label: 'Go', source: 'community-measured', window: 27_000 },
-    { id: 'plus-instant', label: 'Plus — Instant models', source: 'community-measured', window: 54_000 },
-    { id: 'plus-reasoning', label: 'Plus — Reasoning models', source: 'community-measured', window: 256_000 },
-    { id: 'pro-instant', label: 'Pro — Instant models', source: 'community-measured', window: 128_000 },
-    { id: 'pro-reasoning', label: 'Pro — Reasoning models', source: 'community-measured', window: 400_000 },
+    { id: 'free', label: 'Free', source: 'official', window: 27_000 },
+    { id: 'go-instant', label: 'Go — Instant models', source: 'official', window: 54_000 },
+    { id: 'go-reasoning', label: 'Go — Reasoning models', source: 'official', window: 256_000 },
+    { id: 'plus-instant', label: 'Plus — Instant models', source: 'official', window: 54_000 },
+    { id: 'plus-reasoning', label: 'Plus — Reasoning models', source: 'official', window: 256_000 },
+    { id: 'pro-instant', label: 'Pro — Instant models', source: 'official', window: 128_000 },
+    { id: 'pro-reasoning', label: 'Pro — Reasoning models', source: 'official', window: 400_000 },
   ],
   claude: [
     { id: 'default', label: 'Default models', source: 'official', window: 200_000 },
