@@ -25,12 +25,6 @@ export const DEFAULT_WINDOWS: Record<PlatformId, number> = {
   gemini: 32_000,
 }
 
-export const WINDOW_SOURCES: Record<PlatformId, string> = {
-  chatgpt: 'Official pricing page: Free 27K; Go/Plus 54K Instant / 256K Reasoning; Pro 128K / 400K.',
-  claude: 'Official Anthropic docs: 200K default, 500K or 1M on newer models.',
-  gemini: 'Official Google docs: 32K free, 128K AI Plus, 1M AI Pro/Ultra.',
-}
-
 export const RESPONSE_TIMEOUT_MS = 90_000
 /** How long the last assistant text must stay unchanged to count as "finished". */
 export const STABLE_MS = 1_400
