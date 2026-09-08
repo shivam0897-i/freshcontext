@@ -12,6 +12,8 @@ export interface MeterState {
   pct: number
   level: Level
   messages: number
+  /** Where the window size came from, for display ("SONNET 5 · DETECTED" / "PLAN SETTING"). */
+  windowLabel?: string
   /**
    * True while the first full read of this conversation is still in flight —
    * the badge shows "measuring" instead of a number we know is unreliable

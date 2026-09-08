@@ -114,6 +114,20 @@ describe('claude adapter (DOM contract)', () => {
     load(CLAUDE_DOM)
     expect(claude.getComposer()?.getAttribute('data-placeholder')).toBe('How can I help?')
   })
+
+  it('detects the active model from the model picker', () => {
+    load(CLAUDE_DOM)
+    const picker = document.createElement('button')
+    picker.setAttribute('aria-label', 'Model')
+    picker.textContent = 'Claude Sonnet 5'
+    document.body.appendChild(picker)
+    expect(claude.detectActiveModel!()).toBe('Claude Sonnet 5')
+  })
+
+  it('returns null when no known model is visible', () => {
+    load(CLAUDE_DOM)
+    expect(claude.detectActiveModel!()).toBeNull()
+  })
 })
 
 describe('gemini adapter (DOM contract)', () => {

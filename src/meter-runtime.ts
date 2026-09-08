@@ -2,6 +2,7 @@ import type { PlatformId } from './core/constants'
 import type { MeterRequest, MeterSettings } from './core/meter-engine'
 import { createMeterEngine } from './core/meter-engine'
 import { countTokensViaBackground } from './core/rpc'
+import { windowForModel } from './core/presets'
 import type { Settings } from './core/storage'
 import type { MeterState } from './core/meter'
 import type { PlatformAdapter } from './platforms/types'
@@ -30,9 +31,12 @@ export interface MeterRuntime {
 export function startMeter(
   adapter: PlatformAdapter,
   badge: BadgeController,
-  settings: Settings,
+  initialSettings: Settings,
 ): MeterRuntime {
+  let settings = initialSettings
   let readTimer: ReturnType<typeof setTimeout> | null = null
+  let lastWindowSize = settings.windows[adapter.id]
+  let lastWindowLabel: string | undefined
 
   const engine = createMeterEngine({
     platform: adapter.id,
@@ -77,7 +81,26 @@ export function startMeter(
     }
   }
 
+  /**
+   * The effective window: auto-detected from the active model where the
+   * model determines it (Claude), otherwise the user's plan setting. A model
+   * switch mid-conversation changes the divisor, and the engine recomputes
+   * the display from its retained readings — no re-read of the page needed.
+   */
+  function applyWindow(): void {
+    const modelText = adapter.detectActiveModel?.() ?? null
+    const resolved = modelText ? windowForModel(adapter.id, modelText) : null
+    const size = resolved?.window ?? settings.windows[adapter.id]
+    const label = resolved ? `${resolved.label} DETECTED` : undefined
+    if (size !== lastWindowSize || label !== lastWindowLabel) {
+      lastWindowSize = size
+      lastWindowLabel = label
+      engine.dispatch({ type: 'settings', settings: { windowSize: size, windowLabel: label } })
+    }
+  }
+
   function tick(): void {
+    applyWindow()
     engine.dispatch({
       type: 'snapshot',
       url: location.href,
@@ -90,7 +113,9 @@ export function startMeter(
 
   return {
     updateSettings(next: Settings) {
+      settings = next
       engine.dispatch({ type: 'settings', settings: meterSettingsFor(adapter.id, next) })
+      applyWindow()
     },
     getDisplayed: () => engine.getDisplayed(),
     refresh: tick,

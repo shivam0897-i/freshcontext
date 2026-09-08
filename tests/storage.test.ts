@@ -39,7 +39,7 @@ describe('settings', () => {
   it('returns defaults when nothing is stored', async () => {
     const s = await getSettings()
     expect(s.thresholds.amber).toBe(0.7)
-    expect(s.windows.chatgpt).toBe(32_000)
+    expect(s.windows.chatgpt).toBe(27_000)
     expect(s.promptTemplate).toBe(DEFAULT_PROMPT)
     expect(s.autoSend).toBe(false)
     expect(s.badgeVisible).toBe(true)

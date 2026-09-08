@@ -51,6 +51,8 @@ import type { ChatMessage } from '../platforms/types'
 export interface MeterSettings {
   windowSize: number
   thresholds: Thresholds
+  /** Display provenance of windowSize ("SONNET 5 · DETECTED" / "PLAN SETTING"). */
+  windowLabel?: string
 }
 
 /** A token reading of a conversation, however it was obtained. */
@@ -145,6 +147,7 @@ export function createMeterEngine(
       a.tokens === b.tokens &&
       a.exact === b.exact &&
       a.window === b.window &&
+      a.windowLabel === b.windowLabel &&
       a.messages === b.messages &&
       a.measuring === b.measuring
     )
@@ -159,6 +162,7 @@ export function createMeterEngine(
         tokens: 0,
         exact: false,
         window: settings.windowSize,
+        windowLabel: settings.windowLabel,
         pct: 0,
         level: 'ok',
         messages: live?.messages.length ?? 0,
@@ -169,14 +173,14 @@ export function createMeterEngine(
 
     if (!live || live.messages.length <= best.messages.length) {
       // Baseline only: DOM is a virtualized tail of the same conversation.
-      emit(
-        computeState(
-          best.messages,
-          settings.windowSize,
-          best.exact ? best.tokens : null,
-          settings.thresholds,
-        ),
+      const state = computeState(
+        best.messages,
+        settings.windowSize,
+        best.exact ? best.tokens : null,
+        settings.thresholds,
       )
+      state.windowLabel = settings.windowLabel
+      emit(state)
       return
     }
 
@@ -191,6 +195,7 @@ export function createMeterEngine(
       tokens,
       exact: best.exact && deltaTokens === 0,
       window: settings.windowSize,
+      windowLabel: settings.windowLabel,
       pct,
       level: classify(pct, settings.thresholds),
       messages: live.messages.length,

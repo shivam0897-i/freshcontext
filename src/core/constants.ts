@@ -10,14 +10,17 @@ export const DEFAULT_THRESHOLDS: Thresholds = { amber: 0.7, red: 0.85 }
 /**
  * Context-window defaults (tokens) per platform.
  *
- * Sources (research, 2026-09-06):
- * - chatgpt: community-measured — free ~16K, Plus/Business ~32K, Pro ~128K.
- *   OpenAI publishes no web-app numbers, so this is a starting point users can override.
- * - claude: official — 200K default; 500K (Opus 4.6+/Sonnet 4.6); 1M (Sonnet 5/Opus 5/Fable 5.1).
+ * Sources (research, 2026-09-08):
+ * - chatgpt: community-measured (OpenAI publishes no web-app numbers) —
+ *   Free/Go ~27K; Plus 54K Instant / 256K Reasoning; Pro 128K / 400K.
+ *   The default is deliberately the Free-class window: over-warning a paid
+ *   user beats silently under-warning a free one.
+ * - claude: official — 200K default; 500K (Opus 4.6+/Sonnet 4.6); 1M
+ *   (Sonnet 5/Opus 5/Fable 5.1). Auto-detected from the active model.
  * - gemini: official — 32K free; 128K AI Plus; 1M AI Pro/Ultra.
  */
 export const DEFAULT_WINDOWS: Record<PlatformId, number> = {
-  chatgpt: 32_000,
+  chatgpt: 27_000,
   claude: 200_000,
   gemini: 32_000,
 }

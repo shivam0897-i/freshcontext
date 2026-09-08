@@ -81,4 +81,10 @@ export interface PlatformAdapter {
   readConversationById?(id: string): Promise<ChatMessage[]>
   /** The conversation currently open in this tab, if the URL identifies one. */
   currentConversationId?(): string | null
+  /**
+   * Display text of the active model, read from the page's model picker —
+   * present where the model determines the context window (Claude). Null
+   * when unknown, in which case the user's plan setting governs.
+   */
+  detectActiveModel?(): string | null
 }

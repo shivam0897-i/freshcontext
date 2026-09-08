@@ -24,6 +24,12 @@ export interface BadgeOptions {
   onPickChat?: () => void
 }
 
+/** 1,000,000 → "1M"; 32,000 → "32K" — the divisor shown on the badge. */
+function formatWindow(window: number): string {
+  if (window % 1_000_000 === 0) return `${window / 1_000_000}M`
+  return `${Math.round(window / 1000)}K`
+}
+
 const LEVEL_COLOR: Record<string, string> = {
   ok: TOKENS.green,
   amber: TOKENS.amber,
@@ -329,7 +335,8 @@ export function mountBadge(options: BadgeOptions): BadgeController {
         : current.level === 'amber'
           ? 'Quality can drop soon. A fresh start carries everything over as a compact brief.'
           : 'Plenty of context left. Nothing to do yet.'
-    meta.textContent = `~${current.tokens.toLocaleString()} TOKENS · ${current.messages} MSGS${left !== null ? ` · ~${left} LEFT` : ''}${current.exact ? '' : ' · EST'}`
+    const windowPart = formatWindow(current.window)
+    meta.textContent = `~${current.tokens.toLocaleString()} TOKENS · ${current.messages} MSGS${left !== null ? ` · ~${left} LEFT` : ''} · ÷${windowPart}${current.windowLabel ? ` · ${current.windowLabel}` : ''}${current.exact ? '' : ' · EST'}`
   }
 
   function renderLimit(): void {

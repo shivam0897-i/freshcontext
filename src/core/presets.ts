@@ -55,10 +55,17 @@ export interface PlanPreset {
  * publishes none for the web app); Claude and Gemini sizes are official.
  */
 export const PLAN_PRESETS: Record<PlatformId, PlanPreset[]> = {
+  // ChatGPT's web-app windows are community-measured (OpenAI publishes none)
+  // and split by model MODE within paid plans: Instant models get a smaller
+  // window than Reasoning models on the same subscription. Business tracks
+  // Plus. These drift across model eras; users can enter a custom size.
   chatgpt: [
-    { id: 'free', label: 'Free', source: 'community-measured', window: 16_000 },
-    { id: 'plus', label: 'Plus / Business', source: 'community-measured', window: 32_000 },
-    { id: 'pro', label: 'Pro', source: 'community-measured', window: 128_000 },
+    { id: 'free', label: 'Free', source: 'community-measured', window: 27_000 },
+    { id: 'go', label: 'Go', source: 'community-measured', window: 27_000 },
+    { id: 'plus-instant', label: 'Plus — Instant models', source: 'community-measured', window: 54_000 },
+    { id: 'plus-reasoning', label: 'Plus — Reasoning models', source: 'community-measured', window: 256_000 },
+    { id: 'pro-instant', label: 'Pro — Instant models', source: 'community-measured', window: 128_000 },
+    { id: 'pro-reasoning', label: 'Pro — Reasoning models', source: 'community-measured', window: 400_000 },
   ],
   claude: [
     { id: 'default', label: 'Default models', source: 'official', window: 200_000 },
@@ -79,4 +86,40 @@ export const PLAN_SOURCES: Record<string, string> = {
 
 export function planForWindow(platform: PlatformId, window: number): PlanPreset | null {
   return PLAN_PRESETS[platform].find((p) => p.window === window) ?? null
+}
+
+/**
+ * Active-model → context-window resolution. Only Claude's web-app window
+ * depends on the model in the conversation (1M on Fable/Opus 5/Sonnet 5,
+ * 500K on Opus 4.6+/Sonnet 4.6 — note the API allows 1M on those, but the
+ * web app caps them at 500K per Anthropic's consumer docs; 200K otherwise).
+ * ChatGPT's and Gemini's web-app windows depend on the subscription plan,
+ * not the model, so their model text resolves to null and the user's plan
+ * selection governs.
+ */
+export interface ModelWindowRule {
+  pattern: RegExp
+  window: number
+  label: string
+}
+
+const MODEL_WINDOWS: Partial<Record<PlatformId, ModelWindowRule[]>> = {
+  claude: [
+    { pattern: /\b(fable|opus\s*5|sonnet\s*5)\b/i, window: 1_000_000, label: '1M' },
+    { pattern: /\b(opus\s*4\.[6-9]|sonnet\s*4\.6)\b/i, window: 500_000, label: '500K' },
+    { pattern: /\b(haiku|opus\s*4\.[0-5]|sonnet\s*4\.[0-5])\b/i, window: 200_000, label: '200K' },
+  ],
+}
+
+/** Resolve a context window from the active model's display text, if known. */
+export function windowForModel(
+  platform: PlatformId,
+  modelText: string,
+): { window: number; label: string } | null {
+  const rules = MODEL_WINDOWS[platform]
+  if (!rules) return null
+  for (const rule of rules) {
+    if (rule.pattern.test(modelText)) return { window: rule.window, label: rule.label }
+  }
+  return null
 }

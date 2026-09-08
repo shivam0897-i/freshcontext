@@ -205,6 +205,19 @@ describe('settings changes apply live (no page re-read)', () => {
     expect(h.last().level).toBe('ok')
     expect(h.last().window).toBe(2000)
   })
+
+  it('carries the window provenance label through to the display', () => {
+    const h = harness(1000)
+    h.engine.dispatch({ type: 'snapshot', url: 'u1', messages: h.msgs(10) })
+    h.engine.dispatch({ type: 'fullRead', readId: 1, url: 'u1', messages: h.msgs(10), tokens: 800, exact: true })
+    h.engine.dispatch({
+      type: 'settings',
+      settings: { windowSize: 500_000, windowLabel: '500K DETECTED' },
+    })
+    expect(h.last().window).toBe(500_000)
+    expect(h.last().windowLabel).toBe('500K DETECTED')
+    expect(h.last().pct).toBeCloseTo(800 / 500_000)
+  })
 })
 
 describe('degraded counting', () => {
