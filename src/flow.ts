@@ -65,10 +65,24 @@ export async function runFreshStart(adapter: PlatformAdapter, ctx: FlowContext):
 
   const submitted = await adapter.submit()
   if (!submitted.ok) {
-    // A send that doesn't go through is often the quota wall.
+    // A send that doesn't go through is often the quota wall. Check limits,
+    // and if the platform still can't confirm, a failed send on a platform
+    // that metered messages means the message wasn't accepted — treat it as
+    // a limit hit rather than hanging for the full response timeout.
     const limits = await adapter.readLimits()
     if (limits?.hit) {
       await recoverFromLimit(adapter, ctx, settings, limits)
+      return
+    }
+    // The composer didn't clear AND no new response is coming — this is the
+    // "stuck after limit" case. The message was never sent, so waiting for
+    // a reply that will never arrive just wastes the user's time. Go to
+    // quota-recovery immediately.
+    if (!submitted.ok && submitted.reason?.includes('did not clear')) {
+      await recoverFromLimit(adapter, ctx, settings, {
+        hit: true,
+        detail: 'Message could not be sent — likely usage limit reached.',
+      })
       return
     }
     toast.show(

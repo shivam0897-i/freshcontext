@@ -275,11 +275,29 @@ export const claude: PlatformAdapter = {
 
   async readLimits(): Promise<LimitInfo | null> {
     // 1. In-chat limit banner — the immediate, always-available signal.
+    // 1. In-chat limit banner — broadened from live usage: Claude's free-tier
+    // limit message ("You've used all your available messages") may appear
+    // in the chat body, a modal, or a composer-adjacent notice, not only in
+    // error/alert/toast containers. Scan all of them.
     const banner = scanForLimitText(
-      '[class*="error" i], [role="alert"], [class*="banner" i], [class*="toast" i]',
-      /usage limit|limit (?:will reset|resets)|out of (?:free )?messages|try again/i,
+      '[class*="error" i], [role="alert"], [class*="banner" i], [class*="toast" i], ' +
+        '[class*="limit" i], [class*="usage" i], [class*="upgrade" i], ' +
+        '[class*="notice" i], [class*="modal" i], [class*="dialog" i], [data-testid*="limit" i]',
+      /usage limit|limit (?:will reset|resets)|out of (?:free )?messages|try again|used all your available messages|no (?:more )?messages (?:left|remaining|available)|reached your (?:free )?(?:message |usage )?limit|message (?:cap|quota)|exceeded/i,
     )
     if (banner) return banner
+
+    // 1b. Blocked composer: when the free-tier limit is hit, Claude disables
+    // or blocks the send path. A disabled send button on a non-empty page is
+    // a strong limit signal even without visible banner text.
+    const sendButton = findClickableButton(SEND_BUTTON)
+    const composer = getComposer()
+    if (!sendButton && composer && composer.textContent?.trim() !== '') {
+      return {
+        hit: true,
+        detail: 'Send button unavailable with text in the composer — likely limit reached.',
+      }
+    }
 
     // 2. Paid plans expose /usage (the same endpoint ClaudeKit reads). Free
     // accounts return no quota values — we report nothing rather than invent.
