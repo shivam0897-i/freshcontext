@@ -139,7 +139,14 @@ export interface LiveModel {
 }
 
 export async function saveLiveModel(live: LiveModel): Promise<void> {
-  await chrome.storage.local.set({ liveModel: live })
+  // Fire-and-forget: "Extension context invalidated" (extension reloaded
+  // while this tab's old content script is still running) must not surface
+  // as an unhandled rejection on the extensions error page.
+  try {
+    await chrome.storage.local.set({ liveModel: live })
+  } catch {
+    /* context invalidated — the new content script owns storage now */
+  }
 }
 
 export async function getLiveModel(): Promise<LiveModel | null> {

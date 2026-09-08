@@ -114,18 +114,23 @@ async function main(): Promise<void> {
 
   // Settings changed in the side panel apply immediately — no tab reload
   // (platform toggles are the exception; they take effect on next load).
-  chrome.storage.onChanged.addListener((changes, area) => {
-    if (area !== 'local') return
-    if (changes['settings']) {
-      void getSettings().then((next) => {
-        meter?.updateSettings(next)
-        badge.setVisible(next.badgeVisible)
-      })
-    }
-    if (changes['badgePos'] && changes['badgePos'].newValue === undefined) {
-      badge.resetPosition()
-    }
-  })
+  try {
+    chrome.storage.onChanged.addListener((changes, area) => {
+      if (area !== 'local') return
+      if (changes['settings']) {
+        void getSettings().then((next) => {
+          meter?.updateSettings(next)
+          badge.setVisible(next.badgeVisible)
+        })
+      }
+      if (changes['badgePos'] && changes['badgePos'].newValue === undefined) {
+        badge.resetPosition()
+      }
+    })
+  } catch {
+    // "Extension context invalidated" — this tab's script is from a previous
+    // extension load; the fresh one owns the listeners now.
+  }
 
   await handlePendingBrief(adapter, toast)
 }
