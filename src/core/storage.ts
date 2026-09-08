@@ -1,5 +1,5 @@
 import { DEFAULT_PROMPT } from './brief'
-import { planById } from './presets'
+import { planForWindow } from './presets'
 import { DEFAULT_THRESHOLDS, DEFAULT_WINDOWS } from './constants'
 import type { PlatformId, Thresholds } from './constants'
 
@@ -55,13 +55,32 @@ export async function getSettings(): Promise<Settings> {
     promptTemplate: s.promptTemplate?.trim() ? s.promptTemplate : DEFAULT_PROMPT,
   }
   // Migration: installs from before plan selection stored only a window
-  // number. A window that matches no plan default is the user's custom
-  // choice — keep it authoritative instead of silently re-plan-ing them.
+  // number. Map it forward honestly — a window matching any current plan
+  // (either mode) selects that plan; a window matching a LEGACY plan preset
+  // (ChatGPT's old community-measured sizes) selects its successor; only a
+  // truly unknown number is the user's custom choice.
   if (!s.plans) {
+    const legacyChatGptPlans: Record<number, string> = {
+      16_000: 'free', // old Free preset
+      32_000: 'plus', // old Plus/Business preset
+      128_000: 'pro', // old Pro preset (unchanged)
+    }
     for (const platform of Object.keys(merged.windows) as PlatformId[]) {
-      const plan = planById(platform, merged.plans[platform])
-      const fallback = plan ? plan.instantWindow : DEFAULT_WINDOWS[platform]
-      if (merged.windows[platform] !== fallback) merged.plans[platform] = 'custom'
+      const stored = merged.windows[platform]
+      const current = planForWindow(platform, stored)
+      if (current) {
+        merged.plans[platform] = current.id
+      } else if (platform === 'chatgpt' && legacyChatGptPlans[stored]) {
+        merged.plans[platform] = legacyChatGptPlans[stored] as string
+        merged.windows[platform] =
+          legacyChatGptPlans[stored] === 'free'
+            ? 27_000
+            : legacyChatGptPlans[stored] === 'plus'
+              ? 256_000
+              : 400_000
+      } else {
+        merged.plans[platform] = 'custom'
+      }
     }
   }
   return merged

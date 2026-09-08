@@ -4,6 +4,7 @@ import {
   WARNING_PRESETS,
   chatgptModeForText,
   fallbackModeForPlan,
+  formatWindow,
   planById,
   planForWindow,
   presetForThresholds,
@@ -135,23 +136,40 @@ describe('effective window resolution (detection-first)', () => {
     })
   })
 
-  it('chatgpt: unreadable mode falls back to the plan default (Reasoning on paid)', () => {
-    expect(resolveWindow('chatgpt', 'plus', null)).toEqual({ window: 256_000, label: null })
-    expect(resolveWindow('chatgpt', 'free', null)).toEqual({ window: 27_000, label: null })
+  it('chatgpt: unreadable mode falls back to the plan default, honestly labeled ASSUMED', () => {
+    expect(resolveWindow('chatgpt', 'plus', null)).toEqual({
+      window: 256_000,
+      label: 'PLUS · REASONING · ASSUMED',
+    })
+    expect(resolveWindow('chatgpt', 'free', null)).toEqual({
+      window: 27_000,
+      label: 'FREE · INSTANT · ASSUMED',
+    })
     expect(fallbackModeForPlan(planById('chatgpt', 'free')!)).toBe('instant')
     expect(fallbackModeForPlan(planById('chatgpt', 'pro')!)).toBe('reasoning')
   })
 
-  it('chatgpt: model text that names no mode is ignored, not guessed', () => {
-    expect(resolveWindow('chatgpt', 'pro', 'GPT-5.6 Sol')).toEqual({ window: 400_000, label: null })
+  it('chatgpt: model text that names no mode falls back with the ASSUMED label', () => {
+    expect(resolveWindow('chatgpt', 'pro', 'GPT-5.6 Sol')).toEqual({
+      window: 400_000,
+      label: 'PRO · REASONING · ASSUMED',
+    })
+  })
+
+  it('a custom window is authoritative on EVERY platform — detection does not override it', () => {
+    expect(resolveWindow('claude', 'custom', 'Claude Sonnet 5')).toBeNull()
+    expect(resolveWindow('chatgpt', 'custom', 'GPT-5.6 Thinking')).toBeNull()
+    expect(resolveWindow('gemini', 'custom', null)).toBeNull()
   })
 
   it('gemini: the plan alone determines the window', () => {
     expect(resolveWindow('gemini', 'aiplus', null)).toEqual({ window: 128_000, label: null })
   })
 
-  it('a custom plan id resolves to nothing — the stored window governs', () => {
-    expect(resolveWindow('chatgpt', 'custom', null)).toBeNull()
+  it('formatWindow renders one consistent size form for every surface', () => {
+    expect(formatWindow(1_000_000)).toBe('1M')
+    expect(formatWindow(500_000)).toBe('500K')
+    expect(formatWindow(27_000)).toBe('27K')
   })
 
   it('mode classification from picker text', () => {

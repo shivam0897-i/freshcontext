@@ -148,6 +148,7 @@ export function createMeterEngine(
       a.exact === b.exact &&
       a.window === b.window &&
       a.windowLabel === b.windowLabel &&
+      a.level === b.level &&
       a.messages === b.messages &&
       a.measuring === b.measuring
     )
@@ -233,7 +234,9 @@ export function createMeterEngine(
         state.live = null
         state.best = null
         state.lastSnapshotSignature = null
-        emit(computeState([], state.settings.windowSize, null, state.settings.thresholds))
+        const emptyState = computeState([], state.settings.windowSize, null, state.settings.thresholds)
+        emptyState.windowLabel = state.settings.windowLabel
+        emit(emptyState)
       }
       return
     }
@@ -268,7 +271,11 @@ export function createMeterEngine(
     state.settings = { ...state.settings, ...patch }
     if (state.displayed === null) return
     if (state.best || state.live) renderAnchored()
-    else emit(computeState([], state.settings.windowSize, null, state.settings.thresholds))
+    else {
+      const emptyState = computeState([], state.settings.windowSize, null, state.settings.thresholds)
+      emptyState.windowLabel = state.settings.windowLabel
+      emit(emptyState)
+    }
   }
 
   return {

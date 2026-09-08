@@ -7,6 +7,7 @@ import {
   insertViaExecCommand,
   insertViaPaste,
   pressEnter,
+  scanModelText,
   sleep,
   verifyContains,
   waitForNewAssistantMessage,
@@ -202,21 +203,10 @@ export const chatgpt: PlatformAdapter = {
   },
 
   detectActiveModel(): string | null {
-    // Best-effort: the model picker near the composer names the active model.
-    // Prefer the SHORTEST matching text: the picker label is
-    // compact, while banners and marketing copy mentioning model
-    // names are long.
-    let best: string | null = null
-    const candidates = document.querySelectorAll<HTMLElement>(
-      'button, [aria-haspopup="listbox"], [data-testid*="model"]',
-    )
-    for (const el of candidates) {
-      const text = elementText(el).trim()
-      if (/\b(gpt|thinking|instant|reasoning|extended)\b/i.test(text)) {
-        if (best === null || text.length < best.length) best = text
-      }
-    }
-    return best
+    // Shared scan (shortest match, suppressed while a dropdown is open).
+    // "chatgpt" is in the pattern because the picker label is often the
+    // compound "ChatGPT 5.2" — \bgpt\b alone has no boundary inside it.
+    return scanModelText(/\b(gpt|chatgpt|thinking|instant|reasoning|extended)\b/i)
   },
 
   async waitForResponse(timeoutMs: number): Promise<string | null> {

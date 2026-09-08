@@ -129,6 +129,33 @@ describe('claude adapter (DOM contract)', () => {
     expect(claude.detectActiveModel!()).toBeNull()
   })
 
+  it('suppresses detection while a dropdown menu is open', () => {
+    load(CLAUDE_DOM)
+    const picker = document.createElement('button')
+    picker.textContent = 'Claude Sonnet 5'
+    document.body.appendChild(picker)
+    expect(claude.detectActiveModel!()).toBe('Claude Sonnet 5')
+    // User opens the model menu: the trigger becomes aria-expanded, and the
+    // menu's shorter option rows must not win the shortest-match scan.
+    picker.setAttribute('aria-haspopup', 'listbox')
+    picker.setAttribute('aria-expanded', 'true')
+    const menuItem = document.createElement('button')
+    menuItem.textContent = 'Haiku'
+    document.body.appendChild(menuItem)
+    expect(claude.detectActiveModel!()).toBeNull()
+    picker.setAttribute('aria-expanded', 'false')
+    menuItem.remove()
+    expect(claude.detectActiveModel!()).toBe('Claude Sonnet 5')
+  })
+
+  it('chatgpt: detects the compound "ChatGPT" picker label', () => {
+    load(CHATGPT_DOM)
+    const picker = document.createElement('button')
+    picker.textContent = 'ChatGPT 5.2'
+    document.body.appendChild(picker)
+    expect(chatgpt.detectActiveModel!()).toBe('ChatGPT 5.2')
+  })
+
   it('prefers the compact picker label over long banners naming the model', () => {
     load(CLAUDE_DOM)
     const banner = document.createElement('button')

@@ -1,12 +1,14 @@
 import { POLL_MS, RESPONSE_TIMEOUT_MS, STABLE_MS } from '../core/constants'
 import {
   composerText,
+  dropNested,
   elementText,
   findClickableButton,
   insertViaExecCommand,
   insertViaPaste,
   pressEnter,
   readCookie,
+  scanModelText,
   sleep,
   verifyContains,
   waitForNewAssistantMessage,
@@ -41,6 +43,7 @@ function getComposer(): HTMLElement | null {
 
 const CLAUDE_MESSAGE_SELECTOR =
   '[data-testid="assistant-message"], [data-testid="user-message"], .font-claude-response'
+const CLAUDE_MODEL_PATTERN = /\b(opus|sonnet|haiku|fable)\b/i
 
 /**
  * DOM fallback, written against Claude's current markup (verified against a
@@ -53,9 +56,7 @@ const CLAUDE_MESSAGE_SELECTOR =
  */
 function readViaDom(): ChatMessage[] {
   const container = document.querySelector('main') ?? document.body
-  const roots = Array.from(container.querySelectorAll(CLAUDE_MESSAGE_SELECTOR)).filter(
-    (node, _index, all) => !all.some((other) => other !== node && other.contains(node)),
-  )
+  const roots = dropNested(Array.from(container.querySelectorAll(CLAUDE_MESSAGE_SELECTOR)))
   const out: ChatMessage[] = []
   for (const root of roots) {
     const role = root.matches('[data-testid="user-message"]') ? 'user' : 'assistant'
@@ -208,21 +209,9 @@ export const claude: PlatformAdapter = {
   },
 
   detectActiveModel(): string | null {
-    // Best-effort: the model picker near the composer shows the active model.
-    // Prefer the SHORTEST matching text: the picker label is
-    // compact, while banners and marketing copy mentioning model
-    // names are long.
-    let best: string | null = null
-    const candidates = document.querySelectorAll<HTMLElement>(
-      'button, [aria-haspopup="listbox"], [data-testid*="model"]',
-    )
-    for (const el of candidates) {
-      const text = elementText(el).trim()
-      if (/\b(opus|sonnet|haiku|fable)\b/i.test(text)) {
-        if (best === null || text.length < best.length) best = text
-      }
-    }
-    return best
+    // Shared scan: shortest model-family match among interactive controls,
+    // suppressed while a dropdown is open (see scanModelText).
+    return scanModelText(CLAUDE_MODEL_PATTERN)
   },
 
   async waitForResponse(timeoutMs: number): Promise<string | null> {

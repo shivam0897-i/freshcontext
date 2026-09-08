@@ -21,6 +21,11 @@ import type { BadgeController } from './ui/badge'
 const TICK_MS = 2500
 const INITIAL_READ_DELAY_MS = 400
 const SETTLED_READ_DEBOUNCE_MS = 3000
+/** The active model changes only on explicit user action — re-scanning the
+ *  picker (a layout-forcing innerText pass over every button) every tick is
+ *  wasted work. Scan every Nth tick, plus immediately on URL or settings
+ *  changes. */
+const MODEL_SCAN_EVERY_N_TICKS = 4
 
 export interface MeterRuntime {
   updateSettings(settings: Settings): void
@@ -35,9 +40,9 @@ export function startMeter(
 ): MeterRuntime {
   let settings = initialSettings
   let readTimer: ReturnType<typeof setTimeout> | null = null
-  let lastWindowSize = settings.windows[adapter.id]
-  let lastWindowLabel: string | undefined
   let lastDetectedModel: string | null = null
+  let lastUrl: string | null = null
+  let tickCount = 0
 
   const engine = createMeterEngine({
     platform: adapter.id,
@@ -89,37 +94,43 @@ export function startMeter(
    * the display from its retained readings — no re-read of the page needed.
    */
   /**
-   * The active model's text, with hysteresis: a single missed scan (picker
-   * re-rendering, dropdown open, DOM churn) must not flip the divisor to
-   * the plan fallback and back — the last known model holds until a new one
-   * is actually read.
+   * The active model's text, with hysteresis: a missed scan (picker
+   * re-rendering, dropdown open — scanModelText returns null while any menu
+   * is expanded) must not flip the divisor to the plan fallback and back.
+   * The cache is cleared on conversation switch so a new chat never inherits
+   * the previous chat's model, and the scan itself runs on a cadence because
+   * the model changes only on explicit user action.
    */
-  function currentModelText(): string | null {
-    const detected = adapter.detectActiveModel?.() ?? null
-    if (detected) {
-      lastDetectedModel = detected
-      return detected
+  function currentModelText(forceScan: boolean): string | null {
+    if (location.href !== lastUrl) {
+      lastUrl = location.href
+      lastDetectedModel = null
+      forceScan = true
+    }
+    if (forceScan || tickCount % MODEL_SCAN_EVERY_N_TICKS === 0) {
+      const detected = adapter.detectActiveModel?.() ?? null
+      if (detected) lastDetectedModel = detected
     }
     return lastDetectedModel
   }
 
-  function applyWindow(): void {
-    const modelText = currentModelText()
+  function applyWindow(forceScan = false): void {
+    const modelText = currentModelText(forceScan)
     const resolved = resolveWindow(adapter.id, settings.plans[adapter.id], modelText)
     const plan = planById(adapter.id, settings.plans[adapter.id])
-    const size = resolved?.window ?? settings.windows[adapter.id]
+    const window = resolved?.window ?? settings.windows[adapter.id]
     // Provenance: detected model/mode, else the plan setting, else a custom
-    // window number with no label (the badge shows the bare divisor).
+    // window number with no label (the badge shows the bare divisor). The
+    // engine's own display dedup absorbs repeated identical dispatches, so
+    // no shadow cache of "last applied window" is kept here — that second
+    // source of truth is exactly what caused the divisor flicker before.
     const label =
       resolved?.label ?? (resolved && plan ? `${plan.label.toUpperCase()} · SETTING` : undefined)
-    if (size !== lastWindowSize || label !== lastWindowLabel) {
-      lastWindowSize = size
-      lastWindowLabel = label
-      engine.dispatch({ type: 'settings', settings: { windowSize: size, windowLabel: label } })
-    }
+    engine.dispatch({ type: 'settings', settings: { windowSize: window, windowLabel: label } })
   }
 
   function tick(): void {
+    tickCount++
     applyWindow()
     engine.dispatch({
       type: 'snapshot',
@@ -135,11 +146,9 @@ export function startMeter(
     updateSettings(next: Settings) {
       settings = next
       // Only thresholds here — applyWindow() is the single dispatcher of
-      // window changes. Dispatching the raw stored fallback first caused a
-      // visible flip (e.g. 500K -> 200K divisor) whenever settings changed,
-      // because detection had not necessarily re-run yet.
+      // window changes (forced scan: the user just changed the plan).
       engine.dispatch({ type: 'settings', settings: { thresholds: next.thresholds } })
-      applyWindow()
+      applyWindow(true)
     },
     getDisplayed: () => engine.getDisplayed(),
     refresh: tick,

@@ -87,11 +87,6 @@ export const PLAN_PRESETS: Record<PlatformId, PlanPreset[]> = {
   ],
 }
 
-export const PLAN_SOURCES: Record<string, string> = {
-  'community-measured': 'Community-measured — OpenAI publishes no web-app numbers.',
-  official: 'Official documentation.',
-}
-
 export function planForWindow(platform: PlatformId, window: number): PlanPreset | null {
   return (
     PLAN_PRESETS[platform].find(
@@ -118,11 +113,17 @@ export function chatgptModeForText(text: string): 'instant' | 'reasoning' | null
 }
 
 /**
- * Resolve the effective context window. Detection-first: the page's active
- * model (Claude) or model mode (ChatGPT) wins when readable; the user's plan
- * selection is the fallback, never the whole story. The label carries the
- * provenance ("1M · DETECTED", "PLUS · REASONING · DETECTED"); null means
- * the caller should derive it from the plan ("PLUS · SETTING").
+ * Resolve the effective context window. Precedence, consistently on every
+ * platform:
+ *   1. A custom window is an explicit user override — it wins everywhere,
+ *      and detection is deliberately ignored (returning null lets the
+ *      caller apply the stored custom number).
+ *   2. A readable active model (Claude) or model mode (ChatGPT) wins over
+ *      the plan selection.
+ *   3. Otherwise the plan governs.
+ * The label carries provenance ("1M · DETECTED", "PLUS · REASONING ·
+ * DETECTED", "PLUS · REASONING · ASSUMED" when the mode had to be guessed);
+ * null means the caller should derive it from the plan ("PLUS · SETTING").
  */
 export interface WindowResolution {
   window: number
@@ -134,17 +135,20 @@ export function resolveWindow(
   planId: string | undefined,
   modelText: string | null,
 ): WindowResolution | null {
+  // 1. Custom windows are authoritative on every platform, identically.
+  if (planId === 'custom') return null
+
+  const plan = planById(platform, planId)
+
   if (platform === 'claude') {
     if (modelText) {
       const byModel = windowForModel(platform, modelText)
       if (byModel) return { window: byModel.window, label: `${byModel.label} · DETECTED` }
     }
-    const plan = planById(platform, planId)
     if (plan) return { window: plan.instantWindow, label: null }
     return null
   }
   if (platform === 'chatgpt') {
-    const plan = planById(platform, planId)
     if (!plan) return null
     const detectedMode = modelText ? chatgptModeForText(modelText) : null
     const mode = detectedMode ?? fallbackModeForPlan(plan)
@@ -152,11 +156,25 @@ export function resolveWindow(
     if (detectedMode) {
       return { window, label: `${plan.label.toUpperCase()} · ${detectedMode.toUpperCase()} · DETECTED` }
     }
-    return { window, label: null }
+    // The mode is a guess (the plan's default); the label must say so —
+    // an Instant user metered against the Reasoning window deserves to
+    // know the divisor is assumed, not read.
+    return {
+      window,
+      label: `${plan.label.toUpperCase()} · ${mode.toUpperCase()} · ASSUMED`,
+    }
   }
-  const plan = planById(platform, planId)
   if (plan) return { window: plan.instantWindow, label: null }
   return null
+}
+
+/**
+ * Window sizes in display form — one rule for every surface (badge divisor,
+ * plan picker, fit readouts): 1,000,000 → "1M"; 32,000 → "32K".
+ */
+export function formatWindow(window: number): string {
+  if (window % 1_000_000 === 0) return `${window / 1_000_000}M`
+  return `${Math.round(window / 1000)}K`
 }
 
 /**

@@ -206,6 +206,31 @@ describe('settings changes apply live (no page re-read)', () => {
     expect(h.last().window).toBe(2000)
   })
 
+  it('re-renders the warning level on a thresholds-only change (level is compared)', () => {
+    const h = harness(1000)
+    h.engine.dispatch({ type: 'snapshot', url: 'u1', messages: h.msgs(10) })
+    h.engine.dispatch({ type: 'fullRead', readId: 1, url: 'u1', messages: h.msgs(10), tokens: 800, exact: true })
+    expect(h.last().level).toBe('amber') // 0.8 with balanced thresholds
+    // Switch to Strict (amber 0.55, red 0.7): tokens/window/messages unchanged.
+    h.engine.dispatch({
+      type: 'settings',
+      settings: { thresholds: { amber: 0.55, red: 0.7 } },
+    })
+    expect(h.last().level).toBe('red') // must re-render, not suppress as a no-op
+  })
+
+  it('empty-chat states carry the window provenance label', () => {
+    const h = harness(1000)
+    h.engine.dispatch({
+      type: 'settings',
+      settings: { windowSize: 1_000_000, windowLabel: '1M · DETECTED' },
+    })
+    h.engine.dispatch({ type: 'snapshot', url: 'u1', messages: [] })
+    h.engine.dispatch({ type: 'snapshot', url: 'u1', messages: [] })
+    expect(h.last().messages).toBe(0)
+    expect(h.last().windowLabel).toBe('1M · DETECTED')
+  })
+
   it('carries the window provenance label through to the display', () => {
     const h = harness(1000)
     h.engine.dispatch({ type: 'snapshot', url: 'u1', messages: h.msgs(10) })

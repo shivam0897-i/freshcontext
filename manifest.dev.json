@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "FreshContext (dev)",
-  "version": "0.4.0",
+  "version": "0.3.2",
   "description": "Dev build \u2014 includes the local demo harness origin.",
   "permissions": [
     "storage",

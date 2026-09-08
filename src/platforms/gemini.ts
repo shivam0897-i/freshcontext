@@ -1,6 +1,7 @@
 import { POLL_MS, RESPONSE_TIMEOUT_MS, STABLE_MS } from '../core/constants'
 import {
   composerText,
+  dropNested,
   elementText,
   findClickableButton,
   insertViaExecCommand,
@@ -41,9 +42,9 @@ function getComposer(): HTMLElement | null {
  */
 function readViaDom(): ChatMessage[] {
   const container = document.querySelector('main') ?? document.body
-  const roots = Array.from(
-    container.querySelectorAll('user-query-content, user-query, model-response'),
-  ).filter((node, _index, all) => !all.some((other) => other !== node && other.contains(node)))
+  const roots = dropNested(
+    Array.from(container.querySelectorAll('user-query-content, user-query, model-response')),
+  )
 
   const out: ChatMessage[] = []
   for (const root of roots) {

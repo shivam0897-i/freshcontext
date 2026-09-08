@@ -1,6 +1,7 @@
 import type { MeterState } from '../core/meter'
 import { messagesLeftEstimate } from '../core/meter'
 import type { LimitInfo } from '../platforms/types'
+import { formatWindow } from '../core/presets'
 import { TOKENS, createShadowHost } from './overlay-lib'
 
 export interface BadgeController {
@@ -24,20 +25,17 @@ export interface BadgeOptions {
   onPickChat?: () => void
 }
 
-/** 1,000,000 → "1M"; 32,000 → "32K" — the divisor shown on the badge. */
-function formatWindow(window: number): string {
-  if (window % 1_000_000 === 0) return `${window / 1_000_000}M`
-  return `${Math.round(window / 1000)}K`
-}
-
 /**
- * Percentages with a decimal below 5%: at 1M-token windows a normal chat
- * sits under 1% for a long time, and a bare "0%" reads as broken. One
- * decimal keeps it honest AND informative.
+ * Percentages readable at 1M-window scale: below 0.1% show "<0.1%" (a bare
+ * "0.0%" reads as broken), below 10% keep one decimal, above that integers.
+ * The fill bar renders a 2% minimum sliver for any non-empty chat so text
+ * and bar never imply "empty".
  */
 function formatPct(pct: number): string {
   const value = pct * 100
-  if (value > 0 && value < 5) return value.toFixed(1)
+  if (value <= 0) return '0'
+  if (value < 0.1) return '<0.1'
+  if (value < 10) return value.toFixed(1)
   return String(Math.round(value))
 }
 

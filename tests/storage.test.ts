@@ -47,14 +47,34 @@ describe('settings', () => {
     expect(s.plans).toEqual({ chatgpt: 'free', claude: 'default', gemini: 'free' })
   })
 
-  it('migrates pre-plan installs: a custom stored window becomes the custom plan', async () => {
+  it('migrates pre-plan installs: legacy plan selections map to their successors', async () => {
+    // 32K was the old Plus/Business preset — an engaged Plus user, not a custom choice.
+    await chrome.storage.local.set({
+      settings: { windows: { chatgpt: 32_000, claude: 200_000, gemini: 32_000 } },
+    })
+    const s = await getSettings()
+    expect(s.plans.chatgpt).toBe('plus')
+    expect(s.plans.claude).toBe('default')
+    expect(s.plans.gemini).toBe('free')
+  })
+
+  it('migrates old Free and Pro windows to their plans', async () => {
+    await chrome.storage.local.set({
+      settings: { windows: { chatgpt: 16_000, claude: 500_000, gemini: 1_000_000 } },
+    })
+    const s = await getSettings()
+    expect(s.plans.chatgpt).toBe('free')
+    expect(s.plans.claude).toBe('newer')
+    expect(s.plans.gemini).toBe('aipro')
+  })
+
+  it('keeps a genuinely custom window custom', async () => {
     await chrome.storage.local.set({
       settings: { windows: { chatgpt: 64_000, claude: 200_000, gemini: 32_000 } },
     })
     const s = await getSettings()
     expect(s.plans.chatgpt).toBe('custom')
     expect(s.windows.chatgpt).toBe(64_000)
-    expect(s.plans.claude).toBe('default') // matches the plan default — not custom
   })
 
   it('merges partial patches with defaults', async () => {

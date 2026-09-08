@@ -5,6 +5,7 @@ import {
   PLAN_PRESETS,
   WARNING_PRESETS,
   fallbackModeForPlan,
+  formatWindow,
   planById,
   planForWindow,
   presetForThresholds,
@@ -148,8 +149,15 @@ function renderPlatforms(): void {
     })
 
     custom.addEventListener('change', () => {
-      const value = Math.max(1000, Number(custom.value) || DEFAULT_WINDOWS[platform])
-      settings.windows[platform] = value
+      // A cleared or zero-filled input must not silently become the
+      // platform default (Number('') || default is the falsy-zero trap) —
+      // invalid input restores the current value and saves nothing.
+      const parsed = Number(custom.value)
+      if (!Number.isFinite(parsed) || parsed < 1000) {
+        custom.value = String(settings.windows[platform])
+        return
+      }
+      settings.windows[platform] = Math.round(parsed)
       settings.plans[platform] = 'custom'
       select.value = 'custom'
       void save({ windows: { ...settings.windows }, plans: { ...settings.plans } })
@@ -163,11 +171,10 @@ function renderPlatforms(): void {
 }
 
 function planOptionLabel(plan: PlanPreset): string {
-  const fmt = (w: number) => `${(w / 1000).toLocaleString()}K`
   if (plan.instantWindow === plan.reasoningWindow) {
-    return `${plan.label} — ${fmt(plan.instantWindow)}`
+    return `${plan.label} — ${formatWindow(plan.instantWindow)}`
   }
-  return `${plan.label} — ${fmt(plan.instantWindow)} / ${fmt(plan.reasoningWindow)}`
+  return `${plan.label} — ${formatWindow(plan.instantWindow)} / ${formatWindow(plan.reasoningWindow)}`
 }
 
 function platformLabel(platform: PlatformId): string {

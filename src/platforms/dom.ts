@@ -174,3 +174,51 @@ export function readCookie(name: string): string | null {
   const m = document.cookie.match(new RegExp(`(?:^|;\\s*)${name}=([^;]*)`))
   return m?.[1] ? decodeURIComponent(m[1]) : null
 }
+
+/**
+ * The shared active-model scan: among interactive controls, the shortest text
+ * matching `pattern` wins — the picker label is compact, while banners and
+ * marketing copy naming models are long. Single implementation for every
+ * platform; the caller supplies the model-name pattern.
+ *
+ * Returns null while a dropdown is held open (any aria-expanded trigger), so
+ * browsing the model menu can never flip the divisor through its option rows.
+ */
+export function scanModelText(pattern: RegExp): string | null {
+  if (document.querySelector('[aria-haspopup][aria-expanded="true"]')) return null
+  let best: string | null = null
+  const candidates = document.querySelectorAll<HTMLElement>(
+    'button, [aria-haspopup="listbox"], [data-testid*="model"]',
+  )
+  for (const el of candidates) {
+    const text = elementText(el).trim()
+    if (pattern.test(text) && (best === null || text.length < best.length)) best = text
+  }
+  return best
+}
+
+/**
+ * Drop nodes nested inside other accepted nodes: walk each node's ancestor
+ * chain against a Set of already-accepted nodes (document order guarantees
+ * an outer node is accepted before its inner ones). O(n·depth) with Set
+ * lookups, replacing the O(n²) all.some(other.contains(node)) filter that
+ * both Claude and Gemini readers had copy-pasted.
+ */
+export function dropNested<T extends Element>(nodes: T[]): T[] {
+  const accepted = new Set<Element>()
+  const out: T[] = []
+  for (const node of nodes) {
+    let nested = false
+    for (let a = node.parentElement; a; a = a.parentElement) {
+      if (accepted.has(a)) {
+        nested = true
+        break
+      }
+    }
+    if (!nested) {
+      accepted.add(node)
+      out.push(node)
+    }
+  }
+  return out
+}
