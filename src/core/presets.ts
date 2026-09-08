@@ -75,10 +75,15 @@ export const PLAN_PRESETS: Record<PlatformId, PlanPreset[]> = {
     { id: 'newer', label: 'Opus 4.6+ / Sonnet 4.6', source: 'official', instantWindow: 500_000, reasoningWindow: 500_000 },
     { id: 'latest', label: 'Sonnet 5 / Opus 5 / Fable 5.1', source: 'official', instantWindow: 1_000_000, reasoningWindow: 1_000_000 },
   ],
+  // AI Pro and AI Ultra are distinct plans that share the 1M context
+  // window — they differ in usage limits (Ultra: 5x-20x Pro's), which the
+  // meter doesn't divide by. Listed separately so the picker reflects the
+  // real subscription lineup.
   gemini: [
     { id: 'free', label: 'Free', source: 'official', instantWindow: 32_000, reasoningWindow: 32_000 },
     { id: 'aiplus', label: 'AI Plus', source: 'official', instantWindow: 128_000, reasoningWindow: 128_000 },
-    { id: 'aipro', label: 'AI Pro / Ultra', source: 'official', instantWindow: 1_000_000, reasoningWindow: 1_000_000 },
+    { id: 'aipro', label: 'AI Pro', source: 'official', instantWindow: 1_000_000, reasoningWindow: 1_000_000 },
+    { id: 'aiultra', label: 'AI Ultra', source: 'official', instantWindow: 1_000_000, reasoningWindow: 1_000_000 },
   ],
 }
 

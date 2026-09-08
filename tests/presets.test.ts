@@ -66,6 +66,14 @@ describe('plan presets', () => {
     }
   })
 
+  it('gemini: Pro and Ultra are distinct plans sharing the 1M window', () => {
+    expect(PLAN_PRESETS.gemini.map((p) => p.id)).toEqual(['free', 'aiplus', 'aipro', 'aiultra'])
+    const byId = Object.fromEntries(PLAN_PRESETS.gemini.map((p) => [p.id, p]))
+    expect(byId.aipro?.instantWindow).toBe(1_000_000)
+    expect(byId.aiultra?.instantWindow).toBe(1_000_000)
+    expect(byId.aiplus?.instantWindow).toBeLessThan(byId.aipro?.instantWindow ?? 0)
+  })
+
   it('keeps plans distinct: one entry per plan, modes carried as dual windows', () => {
     const chatgptIds = PLAN_PRESETS.chatgpt.map((p) => p.id)
     expect(chatgptIds).toEqual(['free', 'go', 'plus', 'pro'])
