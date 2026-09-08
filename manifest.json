@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "FreshContext",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Watch your AI chat's context, get warned before quality drops, and continue in a fresh chat with an AI-written handoff brief.",
   "permissions": [
     "storage",

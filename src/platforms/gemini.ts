@@ -31,15 +31,29 @@ function getComposer(): HTMLElement | null {
   return el instanceof HTMLElement ? el : null
 }
 
+/**
+ * Written against Gemini's current markup (verified against a
+ * live-maintained exporter): user turns wrap their text in
+ * user-query-content > .query-content > .query-text (with bare user-query as
+ * the legacy shape), assistant turns in model-response > message-content >
+ * .markdown. A single combined query keeps document order for the transcript
+ * handoff; nested duplicates (user-query inside user-query-content) drop out.
+ */
 function readViaDom(): ChatMessage[] {
+  const container = document.querySelector('main') ?? document.body
+  const roots = Array.from(
+    container.querySelectorAll('user-query-content, user-query, model-response'),
+  ).filter((node, _index, all) => !all.some((other) => other !== node && other.contains(node)))
+
   const out: ChatMessage[] = []
-  document.querySelectorAll('user-query, model-response').forEach((el) => {
-    const role = el.tagName.toLowerCase() === 'user-query' ? 'user' : 'assistant'
-    const content =
-      el.querySelector('.query-text-line, .query-text, message-content .markdown, .markdown') ?? el
+  for (const root of roots) {
+    const isUser = root.tagName.toLowerCase().startsWith('user-query')
+    const content = isUser
+      ? root.querySelector('.query-content .query-text, .query-text, .query-text-line') ?? root
+      : root.querySelector('message-content .markdown, message-content, .markdown') ?? root
     const text = elementText(content)
-    if (text.trim()) out.push({ role, text })
-  })
+    if (text.trim()) out.push({ role: isUser ? 'user' : 'assistant', text })
+  }
   return out
 }
 
@@ -67,7 +81,7 @@ function lastAssistantText(): string | null {
   const els = document.querySelectorAll('model-response')
   const last = els[els.length - 1]
   if (!last) return null
-  const content = last.querySelector('message-content .markdown, .markdown') ?? last
+  const content = last.querySelector('message-content .markdown, message-content, .markdown') ?? last
   return elementText(content) || null
 }
 

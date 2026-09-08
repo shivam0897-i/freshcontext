@@ -39,35 +39,41 @@ function getComposer(): HTMLElement | null {
   )
 }
 
+const CLAUDE_MESSAGE_SELECTOR =
+  '[data-testid="assistant-message"], [data-testid="user-message"], .font-claude-response'
+
+/**
+ * DOM fallback, written against Claude's current markup (verified against a
+ * live-maintained multi-platform exporter): messages carry
+ * data-testid="user-message" / "assistant-message", with .font-claude-response
+ * as the legacy assistant fallback. Roots can nest (an assistant-message may
+ * contain a .font-claude-response), so nested duplicates are dropped.
+ * querySelectorAll with a combined selector yields document order, which the
+ * transcript handoff depends on.
+ */
+function readViaDom(): ChatMessage[] {
+  const container = document.querySelector('main') ?? document.body
+  const roots = Array.from(container.querySelectorAll(CLAUDE_MESSAGE_SELECTOR)).filter(
+    (node, _index, all) => !all.some((other) => other !== node && other.contains(node)),
+  )
+  const out: ChatMessage[] = []
+  for (const root of roots) {
+    const role = root.matches('[data-testid="user-message"]') ? 'user' : 'assistant'
+    const text = elementText(root)
+    if (text.trim()) out.push({ role, text })
+  }
+  return out
+}
+
 function lastAssistantText(): string | null {
-  const els = document.querySelectorAll('[data-testid="conversation-turn"]')
+  const els = document.querySelectorAll(CLAUDE_MESSAGE_SELECTOR)
   for (let i = els.length - 1; i >= 0; i--) {
     const el = els[i] as HTMLElement
-    if (isAssistantTurn(el)) {
-      const content = el.querySelector('.font-claude-message, .prose') ?? el
-      return elementText(content) || null
+    if (!el.matches('[data-testid="user-message"]')) {
+      return elementText(el) || null
     }
   }
   return null
-}
-
-function isAssistantTurn(turn: HTMLElement): boolean {
-  if (turn.matches('[data-testid*="user" i]')) return false
-  if (turn.querySelector('[data-testid="user-message"], .font-claude-user-message')) return false
-  return true
-}
-
-/** DOM fallback — best-effort: pairs turns and guesses roles from testids/classes. */
-function readViaDom(): ChatMessage[] {
-  const out: ChatMessage[] = []
-  document.querySelectorAll('[data-testid="conversation-turn"]').forEach((el) => {
-    const turn = el as HTMLElement
-    const role = isAssistantTurn(turn) ? 'assistant' : 'user'
-    const content = turn.querySelector('.font-claude-message, .prose, .whitespace-pre-wrap') ?? turn
-    const text = elementText(content)
-    if (text.trim()) out.push({ role, text })
-  })
-  return out
 }
 
 /** Same-session internal-API access — the pattern claude-chat-exporter ships with. */

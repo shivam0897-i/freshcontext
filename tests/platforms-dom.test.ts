@@ -15,17 +15,16 @@ const CHATGPT_DOM = `
   </footer>
 `
 
+// Current Claude markup: user-message / assistant-message testids, with
+// .font-claude-response as the legacy assistant fallback that can NEST inside
+// an assistant-message (the reader must drop the nested duplicate).
 const CLAUDE_DOM = `
   <main>
-    <div data-testid="conversation-turn" data-testid-user="x">
-      <div class="font-claude-user-message">Build a dashboard.</div>
+    <div data-testid="user-message">Build a dashboard.</div>
+    <div data-testid="assistant-message">
+      <div class="font-claude-response">Sure — Vite and Recharts?</div>
     </div>
-    <div data-testid="conversation-turn">
-      <div class="font-claude-message">Sure — Vite and Recharts?</div>
-    </div>
-    <div data-testid="conversation-turn">
-      <div class="font-claude-message">Let me scaffold it for you.</div>
-    </div>
+    <div data-testid="assistant-message">Let me scaffold it for you.</div>
   </main>
   <footer>
     <div data-placeholder="How can I help?" contenteditable="true"></div>
@@ -33,9 +32,14 @@ const CLAUDE_DOM = `
   </footer>
 `
 
+// Current Gemini markup: user text wraps in user-query-content (legacy bare
+// user-query may nest inside it — the reader drops the duplicate), assistant
+// text in model-response > message-content > .markdown.
 const GEMINI_DOM = `
   <main class="chat-history">
-    <user-query><div class="query-text">Build a dashboard.</div></user-query>
+    <user-query-content>
+      <user-query><div class="query-content"><span class="query-text">Build a dashboard.</span></div></user-query>
+    </user-query-content>
     <model-response><message-content><div class="markdown">Sure — Vite and Recharts?</div></message-content></model-response>
     <model-response><message-content><div class="markdown">Let me scaffold it for you.</div></message-content></model-response>
   </main>
